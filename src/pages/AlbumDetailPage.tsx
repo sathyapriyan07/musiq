@@ -5,18 +5,23 @@ import { publicAssetUrl, formatDuration } from "../lib/media";
 import {
   getAlbum,
   getArtist,
+  getSongArtistCreditsForSongs,
   getSongsByAlbum,
   type Album,
   type Artist,
   type Song,
+  type SongArtistCredit,
 } from "../lib/publicQueries";
 import { isSupabaseConfigured } from "../lib/supabaseClient";
+import { formatCreditNames } from "../lib/credits";
 
 export function AlbumDetailPage() {
   const { albumId } = useParams();
   const [album, setAlbum] = useState<Album | null>(null);
   const [artist, setArtist] = useState<Artist | null>(null);
   const [songs, setSongs] = useState<Song[]>([]);
+  const [songArtists, setSongArtists] = useState<Record<string, Artist>>({});
+  const [songCredits, setSongCredits] = useState<Record<string, SongArtistCredit[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,8 +65,33 @@ export function AlbumDetailPage() {
       if (cancelled) return;
       if (artistRes.error) setError(artistRes.error.message);
       if (songsRes.error) setError(songsRes.error.message);
-      setArtist((artistRes.data ?? null) as Artist | null);
-      setSongs((songsRes.data ?? []) as Song[]);
+      const fetchedArtist = (artistRes.data ?? null) as Artist | null;
+      const fetchedSongs = (songsRes.data ?? []) as Song[];
+      setArtist(fetchedArtist);
+      setSongs(fetchedSongs);
+
+      const creditsRes = await getSongArtistCreditsForSongs(fetchedSongs.map((s) => s.id));
+      if (cancelled) return;
+      if (creditsRes.error) setError(creditsRes.error.message);
+      const creditRows = (creditsRes.data ?? []) as SongArtistCredit[];
+      const creditMap: Record<string, SongArtistCredit[]> = {};
+      for (const c of creditRows) {
+        const sid = c.song_id;
+        if (!sid) continue;
+        (creditMap[sid] ??= []).push(c);
+      }
+      setSongCredits(creditMap);
+
+      const artistMap: Record<string, Artist> = {};
+      if (fetchedArtist) artistMap[fetchedArtist.id] = fetchedArtist;
+      const extraIds = [...new Set(
+        fetchedSongs.map((s) => s.primary_artist_id).filter((id): id is string => !!id && !(id in artistMap))
+      )];
+      if (extraIds.length) {
+        const results = await Promise.all(extraIds.map((id) => getArtist(id)));
+        results.forEach((r) => { if (r.data) artistMap[(r.data as Artist).id] = r.data as Artist; });
+      }
+      setSongArtists(artistMap);
       setLoading(false);
     }
     void run();
@@ -70,30 +100,37 @@ export function AlbumDetailPage() {
     };
   }, [albumId]);
 
+  const coverUrl = publicAssetUrl("covers", album?.cover_path);
+
   const trackRows = useMemo(() => {
     return songs.map((s) => {
       const duration = formatDuration(s.duration_seconds);
+      const songArtist = s.primary_artist_id ? songArtists[s.primary_artist_id] : null;
+      const creditedNames = formatCreditNames(songCredits[s.id] ?? []);
+      const displayArtist = creditedNames ?? songArtist?.name ?? null;
       return (
         <Link
           key={s.id}
           to={`/songs/${s.id}`}
           className="flex items-center gap-3 px-4 py-3 hover:bg-panel2"
         >
-          <div className="w-8 text-right text-xs text-muted">
-            {s.track_number ?? "—"}
+          <div className="w-6 shrink-0 text-right text-xs text-muted">{s.track_number ?? "—"}</div>
+          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-panel2">
+            {coverUrl ? <img src={coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" /> : null}
           </div>
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold text-text">{s.title}</div>
+            {displayArtist ? <div className="truncate text-xs text-muted">{displayArtist}</div> : null}
           </div>
           {duration ? <div className="ml-auto text-xs text-muted">{duration}</div> : null}
         </Link>
       );
     });
-  }, [songs]);
-
-  const coverUrl = publicAssetUrl("covers", album?.cover_path);
+  }, [songs, songArtists, songCredits, coverUrl]);
 
   return (
+
+
     <div className="space-y-6">
       <div className="flex items-center gap-2 text-sm text-muted">
         <Link className="hover:text-text" to="/albums">

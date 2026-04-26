@@ -33,6 +33,7 @@ export type Song = {
 };
 
 export type SongArtistCredit = {
+  song_id?: string;
   artist_id: string;
   role: string | null;
   sort_order: number | null;
@@ -188,5 +189,15 @@ export async function getSongArtistCredits(songId: string) {
     .from("song_artists")
     .select("artist_id, role, sort_order, artist:artists(id, name, image_path)")
     .eq("song_id", songId)
+    .order("sort_order", { ascending: true });
+}
+
+export async function getSongArtistCreditsForSongs(songIds: string[]) {
+  if (!songIds.length) return { data: [], error: null };
+  return await supabase
+    .from("song_artists")
+    .select("song_id, artist_id, role, sort_order, artist:artists(id, name, image_path)")
+    .in("song_id", songIds)
+    .order("song_id", { ascending: true })
     .order("sort_order", { ascending: true });
 }

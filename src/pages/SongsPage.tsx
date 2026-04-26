@@ -7,13 +7,16 @@ import { SearchBar } from "../components/SearchBar";
 import { EmptyState, ErrorState } from "../components/States";
 import { ViewToggle, type ViewMode } from "../components/ViewToggle";
 import { publicAssetUrl } from "../lib/media";
+import { formatCreditNames } from "../lib/credits";
 import {
   getAlbums,
   getArtists,
+  getSongArtistCreditsForSongs,
   getSongs,
   type Album,
   type Artist,
   type Song,
+  type SongArtistCredit,
 } from "../lib/publicQueries";
 import { isSupabaseConfigured } from "../lib/supabaseClient";
 
@@ -24,6 +27,7 @@ export function SongsPage() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
+  const [songCredits, setSongCredits] = useState<Record<string, SongArtistCredit[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,9 +52,23 @@ export function SongsPage() {
       if (songsRes.error) setError(songsRes.error.message);
       if (artistsRes.error) setError(artistsRes.error.message);
       if (albumsRes.error) setError(albumsRes.error.message);
-      setSongs((songsRes.data ?? []) as Song[]);
+      const fetchedSongs = (songsRes.data ?? []) as Song[];
+      setSongs(fetchedSongs);
       setArtists((artistsRes.data ?? []) as Artist[]);
       setAlbums((albumsRes.data ?? []) as Album[]);
+
+      const creditsRes = await getSongArtistCreditsForSongs(fetchedSongs.map((s) => s.id));
+      if (cancelled) return;
+      if (creditsRes.error) setError(creditsRes.error.message);
+      const creditRows = (creditsRes.data ?? []) as SongArtistCredit[];
+      const creditMap: Record<string, SongArtistCredit[]> = {};
+      for (const c of creditRows) {
+        const sid = c.song_id;
+        if (!sid) continue;
+        (creditMap[sid] ??= []).push(c);
+      }
+      setSongCredits(creditMap);
+
       setLoading(false);
     }
     void run();
@@ -84,9 +102,8 @@ export function SongsPage() {
     const q = query.trim().toLowerCase();
     if (!q) return songs;
     return songs.filter((s) => {
-      const artistName = s.primary_artist_id
-        ? artistNameById.get(s.primary_artist_id) ?? ""
-        : "";
+      const creditedNames = formatCreditNames(songCredits[s.id] ?? []);
+      const artistName = creditedNames ?? (s.primary_artist_id ? artistNameById.get(s.primary_artist_id) ?? "" : "");
       const albumTitle = s.album_id ? albumTitleById.get(s.album_id) ?? "" : "";
       return (
         s.title.toLowerCase().includes(q) ||
@@ -94,7 +111,7 @@ export function SongsPage() {
         albumTitle.toLowerCase().includes(q)
       );
     });
-  }, [albumTitleById, artistNameById, query, songs]);
+  }, [albumTitleById, artistNameById, query, songs, songCredits]);
 
   return (
     <div className="space-y-5">
@@ -133,10 +150,12 @@ export function SongsPage() {
               key={song.id}
               title={song.title}
               subtitle={
-                song.primary_artist_id
+                formatCreditNames(songCredits[song.id] ?? []) ??
+                (song.primary_artist_id
                   ? artistNameById.get(song.primary_artist_id) ?? "—"
-                  : "—"
+                  : "—")
               }
+              variant="artwork"
               to={`/songs/${song.id}`}
               imageUrl={
                 song.album_id ? albumCoverById.get(song.album_id) : undefined
@@ -147,9 +166,11 @@ export function SongsPage() {
       ) : (
         <div className="divide-y rounded-2xl border bg-panel surface shadow-soft">
           {filtered.map((song) => {
-            const artistName = song.primary_artist_id
-              ? artistNameById.get(song.primary_artist_id) ?? "—"
-              : "—";
+            const artistName =
+              formatCreditNames(songCredits[song.id] ?? []) ??
+              (song.primary_artist_id
+                ? artistNameById.get(song.primary_artist_id) ?? "—"
+                : "—");
             const albumTitle = song.album_id
               ? albumTitleById.get(song.album_id) ?? ""
               : "";
@@ -162,7 +183,7 @@ export function SongsPage() {
                   <img
                     src={cover}
                     alt=""
-                    className="h-10 w-10 rounded-xl border object-cover"
+                    className="h-10 w-10 rounded-xl object-cover"
                     loading="lazy"
                   />
                 ) : (
@@ -193,4 +214,3 @@ export function SongsPage() {
     </div>
   );
 }
-

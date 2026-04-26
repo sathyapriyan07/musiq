@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 type Shape = "square" | "round";
 type Aspect = "square" | "poster" | "video";
+type Variant = "default" | "artwork";
 
 type Props = {
   title: string;
@@ -12,6 +13,7 @@ type Props = {
   imageUrl?: string;
   shape?: Shape;
   aspect?: Aspect;
+  variant?: Variant;
   rightSlot?: ReactNode;
   className?: string;
 };
@@ -35,13 +37,16 @@ export function MediaCard({
   imageUrl,
   shape = "square",
   aspect = "square",
+  variant = "default",
   rightSlot,
   className,
 }: Props) {
   const content = (
     <div
       className={clsx(
-        "group rounded-2xl border bg-panel p-3 transition hover:bg-panel2 surface shadow-soft",
+        variant === "artwork"
+          ? "group transition"
+          : "group rounded-2xl border bg-panel p-3 transition hover:bg-panel2 surface shadow-soft",
         className,
       )}
     >
@@ -49,7 +54,7 @@ export function MediaCard({
         className={clsx(
           "relative w-full overflow-hidden bg-panel2",
           aspectClass(aspect),
-          shape === "round" ? "rounded-full" : "rounded-lg",
+          shape === "round" ? "rounded-full" : variant === "artwork" ? "rounded-2xl" : "rounded-lg",
         )}
       >
         {imageUrl ? (
@@ -72,7 +77,7 @@ export function MediaCard({
         ) : null}
       </div>
 
-      <div className="mt-3 flex items-start gap-3">
+      <div className={clsx("flex items-start gap-3", variant === "artwork" ? "mt-2 px-1" : "mt-3")}>
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold text-text">{title}</div>
           {subtitle ? (

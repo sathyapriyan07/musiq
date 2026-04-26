@@ -72,7 +72,8 @@ export function AlbumsPage() {
               subtitle={
                 a.artist_id ? artistNameById.get(a.artist_id) ?? "—" : "—"
               }
-              aspect="poster"
+              aspect="square"
+              variant="artwork"
               to={`/albums/${a.id}`}
               imageUrl={publicAssetUrl("covers", a.cover_path) ?? undefined}
             />
@@ -82,4 +83,3 @@ export function AlbumsPage() {
     </div>
   );
 }
-
