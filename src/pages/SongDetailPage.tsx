@@ -253,7 +253,6 @@ export function SongDetailPage() {
 
             <div className="mt-4 space-y-1">
               <div className="text-lg font-bold text-text">{song.title}</div>
-              <div className="text-sm text-muted">{artist?.name ?? "—"}</div>
               {durationLabel ? (
                 <div className="pt-2">
                   <span className="inline-flex rounded-full bg-panel2 px-3 py-1 text-xs text-muted">
@@ -267,7 +266,10 @@ export function SongDetailPage() {
           <div className="space-y-5">
             {album?.title ? (
               <div className="text-sm text-muted">
-                Album: <span className="text-text">{album.title}</span>
+                Album:{" "}
+                <Link to={`/albums/${album.id}`} className="text-text hover:underline">
+                  {album.title}
+                </Link>
               </div>
             ) : null}
 

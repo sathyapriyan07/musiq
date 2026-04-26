@@ -4,12 +4,13 @@ import { MediaCard } from "../components/MediaCard";
 import { EmptyState, ErrorState } from "../components/States";
 import { publicAssetUrl } from "../lib/media";
 import {
+  getAlbum,
   getAlbumsByArtist,
   getArtist,
-  getSongsByArtist,
+  getSongCreditsByArtist,
   type Album,
   type Artist,
-  type Song,
+  type ArtistSongCredit,
 } from "../lib/publicQueries";
 import { isSupabaseConfigured } from "../lib/supabaseClient";
 
@@ -17,7 +18,8 @@ export function ArtistDetailPage() {
   const { artistId } = useParams();
   const [artist, setArtist] = useState<Artist | null>(null);
   const [albums, setAlbums] = useState<Album[]>([]);
-  const [songs, setSongs] = useState<Song[]>([]);
+  const [songCredits, setSongCredits] = useState<ArtistSongCredit[]>([]);
+  const [songAlbums, setSongAlbums] = useState<Record<string, Album>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,20 +51,36 @@ export function ArtistDetailPage() {
       setArtist(row);
       if (!row) {
         setAlbums([]);
-        setSongs([]);
+        setSongCredits([]);
         setLoading(false);
         return;
       }
 
       const [albumsRes, songsRes] = await Promise.all([
         getAlbumsByArtist(row.id),
-        getSongsByArtist(row.id, 24),
+        getSongCreditsByArtist(row.id, 24),
       ]);
       if (cancelled) return;
       if (albumsRes.error) setError(albumsRes.error.message);
       if (songsRes.error) setError(songsRes.error.message);
-      setAlbums((albumsRes.data ?? []) as Album[]);
-      setSongs((songsRes.data ?? []) as Song[]);
+      const fetchedAlbums = (albumsRes.data ?? []) as Album[];
+      setAlbums(fetchedAlbums);
+      const credits = (songsRes.data ?? []) as ArtistSongCredit[];
+      setSongCredits(credits);
+
+      const albumMap: Record<string, Album> = {};
+      fetchedAlbums.forEach((a) => { albumMap[a.id] = a; });
+
+      const songAlbumIds = [...new Set(
+        credits
+          .map((c) => (Array.isArray(c.song) ? c.song[0] : c.song)?.album_id)
+          .filter((id): id is string => !!id && !(id in albumMap))
+      )];
+      if (songAlbumIds.length) {
+        const results = await Promise.all(songAlbumIds.map((id) => getAlbum(id)));
+        results.forEach((r) => { if (r.data) albumMap[(r.data as Album).id] = r.data as Album; });
+      }
+      setSongAlbums(albumMap);
       setLoading(false);
     }
     void run();
@@ -85,10 +103,22 @@ export function ArtistDetailPage() {
   }, [albums]);
 
   const songCards = useMemo(() => {
-    return songs.map((s) => (
-      <MediaCard key={s.id} title={s.title} subtitle="Song" to={`/songs/${s.id}`} />
-    ));
-  }, [songs]);
+    function creditSong(credit: ArtistSongCredit) {
+      if (!credit.song) return null;
+      return Array.isArray(credit.song) ? credit.song[0] ?? null : credit.song;
+    }
+
+    return songCredits
+      .map((c) => {
+        const s = creditSong(c);
+        if (!s) return null;
+        const role = c.role?.trim() || (s.primary_artist_id === artist?.id ? "Primary" : "");
+        const subtitle = role ? `Song · ${role}` : "Song";
+        const coverUrl = s.album_id ? publicAssetUrl("covers", songAlbums[s.album_id]?.cover_path) ?? undefined : undefined;
+        return <MediaCard key={`${s.id}:${c.sort_order ?? 0}`} title={s.title} subtitle={subtitle} to={`/songs/${s.id}`} imageUrl={coverUrl} />;
+      })
+      .filter(Boolean);
+  }, [artist?.id, songCredits, songAlbums]);
 
   const avatarUrl = publicAssetUrl("avatars", artist?.image_path);
 
@@ -144,7 +174,7 @@ export function ArtistDetailPage() {
               </section>
             ) : null}
 
-            {songs.length ? (
+            {songCredits.length ? (
               <section className="space-y-3">
                 <div className="text-sm font-semibold text-text">Songs</div>
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{songCards}</div>

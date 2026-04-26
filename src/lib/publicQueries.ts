@@ -46,6 +46,35 @@ export type LinkRow = {
   url: string;
 };
 
+export type ArtistSongCredit = {
+  role: string | null;
+  sort_order: number | null;
+  song:
+    | Pick<
+        Song,
+        | "id"
+        | "title"
+        | "primary_artist_id"
+        | "album_id"
+        | "track_number"
+        | "duration_seconds"
+        | "is_published"
+        | "updated_at"
+      >
+    | Pick<
+        Song,
+        | "id"
+        | "title"
+        | "primary_artist_id"
+        | "album_id"
+        | "track_number"
+        | "duration_seconds"
+        | "is_published"
+        | "updated_at"
+      >[]
+    | null;
+};
+
 export async function getArtists() {
   return await supabase
     .from("artists")
@@ -130,6 +159,18 @@ export async function getSongsByArtist(artistId: string, limit = 50) {
     .eq("is_published", true)
     .eq("primary_artist_id", artistId)
     .order("updated_at", { ascending: false })
+    .limit(limit);
+}
+
+export async function getSongCreditsByArtist(artistId: string, limit = 50) {
+  return await supabase
+    .from("song_artists")
+    .select(
+      "role, sort_order, song:songs(id, title, primary_artist_id, album_id, track_number, duration_seconds, is_published, updated_at)",
+    )
+    .eq("artist_id", artistId)
+    .eq("song.is_published", true)
+    .order("updated_at", { ascending: false, foreignTable: "song" })
     .limit(limit);
 }
 
