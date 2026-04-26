@@ -33,6 +33,7 @@ export function AdminSongsPage() {
 
   const [title, setTitle] = useState("");
   const [primaryArtistId, setPrimaryArtistId] = useState<string>("");
+  const [primaryArtistRole, setPrimaryArtistRole] = useState<string>("");
   const [albumId, setAlbumId] = useState<string>("");
   const [trackNumber, setTrackNumber] = useState<string>("");
   const [durationSeconds, setDurationSeconds] = useState<string>("");
@@ -146,9 +147,17 @@ export function AdminSongsPage() {
     }[];
 
     if (!data.length) {
+      setPrimaryArtistRole("");
       setSongArtists([]);
       setSongArtistsLoading(false);
       return;
+    }
+
+    if (fallbackPrimary) {
+      const primaryRow = data.find((r) => r.artist_id === fallbackPrimary) ?? null;
+      setPrimaryArtistRole(primaryRow?.role ?? "");
+    } else {
+      setPrimaryArtistRole("");
     }
 
     setSongArtists(
@@ -166,6 +175,7 @@ export function AdminSongsPage() {
   async function syncSongArtists(
     songId: string,
     primary: string | null,
+    primaryRole: string | null,
     additionalToSave: SongArtistFormRow[],
   ) {
     const normalizedAdditional = normalizeAdditionalSongArtists(additionalToSave, primary);
@@ -175,7 +185,12 @@ export function AdminSongsPage() {
 
     const toInsert: { song_id: string; artist_id: string; role: string | null; sort_order: number }[] = [];
     if (primary) {
-      toInsert.push({ song_id: songId, artist_id: primary, role: "Primary", sort_order: 0 });
+      toInsert.push({
+        song_id: songId,
+        artist_id: primary,
+        role: primaryRole?.trim() ? primaryRole.trim() : null,
+        sort_order: 0,
+      });
     }
     for (let i = 0; i < normalizedAdditional.length; i++) {
       const r = normalizedAdditional[i];
@@ -251,6 +266,7 @@ export function AdminSongsPage() {
     setEditing(null);
     setTitle("");
     setPrimaryArtistId("");
+    setPrimaryArtistRole("");
     setAlbumId("");
     setTrackNumber("");
     setDurationSeconds("");
@@ -269,6 +285,7 @@ export function AdminSongsPage() {
     setEditing(row);
     setTitle(row.title);
     setPrimaryArtistId(row.primary_artist_id ?? "");
+    setPrimaryArtistRole("");
     setAlbumId(row.album_id ?? "");
     setTrackNumber(row.track_number ? String(row.track_number) : "");
     setDurationSeconds(row.duration_seconds ? String(row.duration_seconds) : "");
@@ -319,7 +336,12 @@ export function AdminSongsPage() {
     const songId = (res.data as { id: string } | null)?.id ?? editing?.id ?? null;
     if (songId) {
       try {
-        await syncSongArtists(songId, primaryArtistId || null, songArtists);
+        await syncSongArtists(
+          songId,
+          primaryArtistId || null,
+          primaryArtistRole || null,
+          songArtists,
+        );
         await syncStreamingLinks(songId);
       } catch (e) {
         setSubmitting(false);
@@ -553,6 +575,19 @@ export function AdminSongsPage() {
                   </option>
                 ))}
               </select>
+
+              <div className="mt-3">
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">
+                  Primary artist role
+                </div>
+                <input
+                  value={primaryArtistRole}
+                  onChange={(e) => setPrimaryArtistRole(e.target.value)}
+                  className="h-11 w-full rounded-xl border bg-panel px-4 text-sm text-text outline-none"
+                  placeholder="Role (e.g. Vocals, Composer)"
+                  disabled={!primaryArtistId}
+                />
+              </div>
 
               <div className="mt-3">
                 <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">

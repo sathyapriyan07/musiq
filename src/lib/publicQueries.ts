@@ -32,6 +32,13 @@ export type Song = {
   updated_at: string;
 };
 
+export type SongArtistCredit = {
+  artist_id: string;
+  role: string | null;
+  sort_order: number | null;
+  artist: Pick<Artist, "id" | "name" | "image_path"> | Pick<Artist, "id" | "name" | "image_path">[] | null;
+};
+
 export type LinkRow = {
   id: string;
   category: "official" | "live" | "lyrics" | "covers" | "other";
@@ -135,3 +142,10 @@ export async function getSongLinks(songId: string) {
     .order("platform", { ascending: true });
 }
 
+export async function getSongArtistCredits(songId: string) {
+  return await supabase
+    .from("song_artists")
+    .select("artist_id, role, sort_order, artist:artists(id, name, image_path)")
+    .eq("song_id", songId)
+    .order("sort_order", { ascending: true });
+}

@@ -7,11 +7,13 @@ import {
   getAlbum,
   getArtist,
   getSong,
+  getSongArtistCredits,
   getSongLinks,
   type Album,
   type Artist,
   type LinkRow,
   type Song,
+  type SongArtistCredit,
 } from "../lib/publicQueries";
 import { isSupabaseConfigured } from "../lib/supabaseClient";
 
@@ -118,12 +120,18 @@ function PreviewPlayer({ src, title }: { src: string; title: string }) {
   );
 }
 
+function creditArtist(credit: SongArtistCredit) {
+  if (!credit.artist) return null;
+  return Array.isArray(credit.artist) ? credit.artist[0] ?? null : credit.artist;
+}
+
 export function SongDetailPage() {
   const { songId } = useParams();
   const [song, setSong] = useState<Song | null>(null);
   const [artist, setArtist] = useState<Artist | null>(null);
   const [album, setAlbum] = useState<Album | null>(null);
   const [links, setLinks] = useState<LinkRow[]>([]);
+  const [credits, setCredits] = useState<SongArtistCredit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -159,18 +167,21 @@ export function SongDetailPage() {
         return;
       }
 
-      const [linksRes, artistRes, albumRes] = await Promise.all([
+      const [linksRes, creditsRes, artistRes, albumRes] = await Promise.all([
         getSongLinks(row.id),
+        getSongArtistCredits(row.id),
         row.primary_artist_id ? getArtist(row.primary_artist_id) : Promise.resolve({ data: null, error: null }),
         row.album_id ? getAlbum(row.album_id) : Promise.resolve({ data: null, error: null }),
       ]);
       if (cancelled) return;
+      if (creditsRes.error) setError(creditsRes.error.message);
       if (artistRes?.error) setError(artistRes.error.message);
       if (albumRes?.error) setError(albumRes.error.message);
       if (linksRes.error) setError(linksRes.error.message);
       setArtist((artistRes.data ?? null) as Artist | null);
       setAlbum((albumRes.data ?? null) as Album | null);
       setLinks((linksRes.data ?? []) as LinkRow[]);
+      setCredits((creditsRes.data ?? []) as SongArtistCredit[]);
 
       setLoading(false);
     }
@@ -193,6 +204,21 @@ export function SongDetailPage() {
   const durationLabel = formatDuration(song?.duration_seconds);
   const youtubeId = parseYouTubeId(song?.youtube_url);
   const coverUrl = publicAssetUrl("covers", album?.cover_path);
+
+  const displayCredits = useMemo(() => {
+    if (credits.length) return credits;
+    if (artist?.id) {
+      return [
+        {
+          artist_id: artist.id,
+          role: "Primary",
+          sort_order: 0,
+          artist: { id: artist.id, name: artist.name, image_path: artist.image_path },
+        } satisfies SongArtistCredit,
+      ];
+    }
+    return [];
+  }, [artist?.id, artist?.image_path, artist?.name, credits]);
 
   return (
     <div className="space-y-6">
@@ -239,40 +265,71 @@ export function SongDetailPage() {
           </div>
 
           <div className="space-y-5">
+            {album?.title ? (
+              <div className="text-sm text-muted">
+                Album: <span className="text-text">{album.title}</span>
+              </div>
+            ) : null}
+
             <div className="rounded-2xl border bg-panel p-5">
-              <div className="text-lg font-bold text-text">Song details</div>
-              <div className="mt-2 text-sm text-muted">
-                {artist?.name ? `Artist: ${artist.name}` : "Artist: —"}
-                {album?.title ? ` · Album: ${album.title}` : ""}
-              </div>
-
-              <div className="mt-4 space-y-4">
-                {song.preview_url ? (
-                  <PreviewPlayer src={song.preview_url} title="Preview" />
-                ) : (
-                  <div className="rounded-2xl border bg-panel2 p-4 text-sm text-muted">
-                    No preview available.
-                  </div>
-                )}
-
-                {youtubeId ? (
-                  <div className="rounded-xl border bg-panel2 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-wider text-muted">
-                      YouTube
-                    </div>
-                    <div className="mt-3 aspect-video overflow-hidden rounded-lg border bg-black">
-                      <iframe
-                        className="h-full w-full"
-                        src={`https://www.youtube.com/embed/${youtubeId}`}
-                        title="YouTube video player"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                        allowFullScreen
-                      />
-                    </div>
-                  </div>
-                ) : null}
-              </div>
+              <div className="text-lg font-bold text-text">Artists</div>
+              {!displayCredits.length ? (
+                <div className="mt-2 text-sm text-muted">No artists credited.</div>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {displayCredits.map((c) => {
+                    const a = creditArtist(c);
+                    const name = a?.name ?? c.artist_id;
+                    const img = a?.image_path ? publicAssetUrl("avatars", a.image_path) : null;
+                    const role = c.role?.trim() ? c.role.trim() : c.sort_order === 0 ? "Primary" : null;
+                    const artistId = a?.id ?? c.artist_id;
+                    return (
+                      <Link
+                        key={`${c.artist_id}:${c.sort_order ?? 0}`}
+                        to={`/artists/${artistId}`}
+                        className="block rounded-xl p-2 -m-2 hover:bg-panel2"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-11 w-11 overflow-hidden rounded-full bg-panel2">
+                            {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : null}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-text">{name}</div>
+                            {role ? <div className="truncate text-xs text-muted">{role}</div> : null}
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
             </div>
+
+            <div className="space-y-3">
+              <div className="text-sm font-semibold text-text">Preview</div>
+              {song.preview_url ? (
+                <PreviewPlayer src={song.preview_url} title="Preview" />
+              ) : (
+                <div className="rounded-2xl border bg-panel2 p-4 text-sm text-muted">
+                  No preview available.
+                </div>
+              )}
+            </div>
+
+            {youtubeId ? (
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-text">YouTube</div>
+                <div className="aspect-video overflow-hidden rounded-2xl bg-black shadow-soft">
+                  <iframe
+                    className="h-full w-full"
+                    src={`https://www.youtube.com/embed/${youtubeId}`}
+                    title="YouTube video player"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
+                </div>
+              </div>
+            ) : null}
 
             {links.length ? <LinkButtons links={groupedLinks} /> : null}
           </div>
