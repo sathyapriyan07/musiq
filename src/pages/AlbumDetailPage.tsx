@@ -1,6 +1,5 @@
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { MediaCard } from "../components/MediaCard";
 import { EmptyState, ErrorState } from "../components/States";
 import { publicAssetUrl, formatDuration } from "../lib/media";
 import {
@@ -92,6 +91,8 @@ export function AlbumDetailPage() {
     });
   }, [songs]);
 
+  const coverUrl = publicAssetUrl("covers", album?.cover_path);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 text-sm text-muted">
@@ -110,12 +111,27 @@ export function AlbumDetailPage() {
         <EmptyState title="Album not found" description="It may have been deleted or unpublished." />
       ) : (
         <div className="grid gap-6 md:grid-cols-[280px_1fr]">
-          <MediaCard
-            title={album.title}
-            subtitle={artist?.name ?? "—"}
-            aspect="poster"
-            imageUrl={publicAssetUrl("covers", album.cover_path) ?? undefined}
-          />
+          <div className="flex flex-col items-center text-center">
+            <div className="w-40 md:w-52">
+              <div className="aspect-[3/4] overflow-hidden rounded-2xl bg-panel2 shadow-soft">
+                {coverUrl ? (
+                  <img src={coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-muted">
+                    <span className="text-xs uppercase tracking-wider">No Image</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-1">
+              <div className="text-lg font-bold text-text">{album.title}</div>
+              <div className="text-sm text-muted">{artist?.name ?? "—"}</div>
+              {album.release_date ? (
+                <div className="pt-1 text-xs text-muted">{album.release_date}</div>
+              ) : null}
+            </div>
+          </div>
 
           <div className="space-y-5">
             <div className="rounded-2xl border bg-panel p-5">
