@@ -8,9 +8,11 @@ import {
   getArtist,
   getSong,
   getSongArtistCredits,
+  getSongChannels,
   getSongLinks,
   type Album,
   type Artist,
+  type SongChannelCredit,
   type LinkRow,
   type Song,
   type SongArtistCredit,
@@ -125,6 +127,11 @@ function creditArtist(credit: SongArtistCredit) {
   return Array.isArray(credit.artist) ? credit.artist[0] ?? null : credit.artist;
 }
 
+function creditChannel(credit: SongChannelCredit) {
+  if (!credit.channel) return null;
+  return Array.isArray(credit.channel) ? credit.channel[0] ?? null : credit.channel;
+}
+
 export function SongDetailPage() {
   const { songId } = useParams();
   const [song, setSong] = useState<Song | null>(null);
@@ -132,6 +139,7 @@ export function SongDetailPage() {
   const [album, setAlbum] = useState<Album | null>(null);
   const [links, setLinks] = useState<LinkRow[]>([]);
   const [credits, setCredits] = useState<SongArtistCredit[]>([]);
+  const [channels, setChannels] = useState<SongChannelCredit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -167,14 +175,16 @@ export function SongDetailPage() {
         return;
       }
 
-      const [linksRes, creditsRes, artistRes, albumRes] = await Promise.all([
+      const [linksRes, creditsRes, channelsRes, artistRes, albumRes] = await Promise.all([
         getSongLinks(row.id),
         getSongArtistCredits(row.id),
+        getSongChannels(row.id),
         row.primary_artist_id ? getArtist(row.primary_artist_id) : Promise.resolve({ data: null, error: null }),
         row.album_id ? getAlbum(row.album_id) : Promise.resolve({ data: null, error: null }),
       ]);
       if (cancelled) return;
       if (creditsRes.error) setError(creditsRes.error.message);
+      if (channelsRes.error) setError(channelsRes.error.message);
       if (artistRes?.error) setError(artistRes.error.message);
       if (albumRes?.error) setError(albumRes.error.message);
       if (linksRes.error) setError(linksRes.error.message);
@@ -182,6 +192,7 @@ export function SongDetailPage() {
       setAlbum((albumRes.data ?? null) as Album | null);
       setLinks((linksRes.data ?? []) as LinkRow[]);
       setCredits((creditsRes.data ?? []) as SongArtistCredit[]);
+      setChannels((channelsRes.data ?? []) as SongChannelCredit[]);
 
       setLoading(false);
     }
@@ -301,6 +312,32 @@ export function SongDetailPage() {
                           </div>
                         </div>
                       </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border bg-panel p-5">
+              <div className="text-lg font-bold text-text">Channels</div>
+              {!channels.length ? (
+                <div className="mt-2 text-sm text-muted">No channels assigned.</div>
+              ) : (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {channels.map((c) => {
+                    const ch = creditChannel(c);
+                    const name = ch?.name ?? c.channel_id;
+                    const img = ch?.logo_path ? publicAssetUrl("logos", ch.logo_path) : null;
+                    return (
+                      <div
+                        key={`${c.channel_id}:${c.sort_order ?? 0}`}
+                        className="flex items-center gap-2 rounded-full border bg-panel2 px-3 py-2"
+                      >
+                        <div className="h-7 w-7 overflow-hidden rounded-full bg-panel">
+                          {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : null}
+                        </div>
+                        <div className="text-sm font-semibold text-text">{name}</div>
+                      </div>
                     );
                   })}
                 </div>

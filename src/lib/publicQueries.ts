@@ -19,6 +19,14 @@ export type Album = {
   updated_at: string;
 };
 
+export type Channel = {
+  id: string;
+  name: string;
+  logo_path: string | null;
+  is_published: boolean;
+  updated_at: string;
+};
+
 export type Song = {
   id: string;
   title: string;
@@ -38,6 +46,18 @@ export type SongArtistCredit = {
   role: string | null;
   sort_order: number | null;
   artist: Pick<Artist, "id" | "name" | "image_path"> | Pick<Artist, "id" | "name" | "image_path">[] | null;
+};
+
+export type SongChannelCredit = {
+  channel_id: string;
+  sort_order: number | null;
+  channel: Pick<Channel, "id" | "name" | "logo_path"> | Pick<Channel, "id" | "name" | "logo_path">[] | null;
+};
+
+export type AlbumChannelCredit = {
+  channel_id: string;
+  sort_order: number | null;
+  channel: Pick<Channel, "id" | "name" | "logo_path"> | Pick<Channel, "id" | "name" | "logo_path">[] | null;
 };
 
 export type LinkRow = {
@@ -199,5 +219,21 @@ export async function getSongArtistCreditsForSongs(songIds: string[]) {
     .select("song_id, artist_id, role, sort_order, artist:artists(id, name, image_path)")
     .in("song_id", songIds)
     .order("song_id", { ascending: true })
+    .order("sort_order", { ascending: true });
+}
+
+export async function getSongChannels(songId: string) {
+  return await supabase
+    .from("song_channels")
+    .select("channel_id, sort_order, channel:channels(id, name, logo_path)")
+    .eq("song_id", songId)
+    .order("sort_order", { ascending: true });
+}
+
+export async function getAlbumChannels(albumId: string) {
+  return await supabase
+    .from("album_channels")
+    .select("channel_id, sort_order, channel:channels(id, name, logo_path)")
+    .eq("album_id", albumId)
     .order("sort_order", { ascending: true });
 }

@@ -12,6 +12,7 @@ import { AdminHome } from "./pages/admin/AdminHome";
 import { AdminSongsPage } from "./pages/admin/AdminSongsPage";
 import { AdminAlbumsPage } from "./pages/admin/AdminAlbumsPage";
 import { AdminArtistsPage } from "./pages/admin/AdminArtistsPage";
+import { AdminChannelsPage } from "./pages/admin/AdminChannelsPage";
 import { AdminLinksPage } from "./pages/admin/AdminLinksPage";
 import { AdminMusicRightsPage } from "./pages/admin/AdminMusicRightsPage";
 import { AdminHomepageSectionsPage } from "./pages/admin/AdminHomepageSectionsPage";
@@ -35,6 +36,7 @@ export function App() {
           <Route path="/admin/songs" element={<AdminSongsPage />} />
           <Route path="/admin/albums" element={<AdminAlbumsPage />} />
           <Route path="/admin/artists" element={<AdminArtistsPage />} />
+          <Route path="/admin/channels" element={<AdminChannelsPage />} />
           <Route path="/admin/links" element={<AdminLinksPage />} />
           <Route path="/admin/music-rights" element={<AdminMusicRightsPage />} />
           <Route

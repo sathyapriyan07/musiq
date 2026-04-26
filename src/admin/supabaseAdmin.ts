@@ -32,10 +32,25 @@ export type SongRow = {
   updated_at: string;
 };
 
+export type ChannelRow = {
+  id: string;
+  name: string;
+  logo_path: string | null;
+  is_published: boolean;
+  updated_at: string;
+};
+
 export async function listArtists() {
   return await supabase
     .from("artists")
     .select("id, name, bio, image_path, is_published, updated_at")
+    .order("updated_at", { ascending: false });
+}
+
+export async function listChannels() {
+  return await supabase
+    .from("channels")
+    .select("id, name, logo_path, is_published, updated_at")
     .order("updated_at", { ascending: false });
 }
 
@@ -97,4 +112,3 @@ export async function ensureAlbum(title: string, artistId: string | null) {
   if (created.error) throw created.error;
   return created.data.id as string;
 }
-

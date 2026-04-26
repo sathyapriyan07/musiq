@@ -5,9 +5,11 @@ import { publicAssetUrl, formatDuration } from "../lib/media";
 import {
   getAlbum,
   getArtist,
+  getAlbumChannels,
   getSongArtistCreditsForSongs,
   getSongsByAlbum,
   type Album,
+  type AlbumChannelCredit,
   type Artist,
   type Song,
   type SongArtistCredit,
@@ -15,10 +17,16 @@ import {
 import { isSupabaseConfigured } from "../lib/supabaseClient";
 import { formatCreditNames } from "../lib/credits";
 
+function creditChannel(credit: AlbumChannelCredit) {
+  if (!credit.channel) return null;
+  return Array.isArray(credit.channel) ? credit.channel[0] ?? null : credit.channel;
+}
+
 export function AlbumDetailPage() {
   const { albumId } = useParams();
   const [album, setAlbum] = useState<Album | null>(null);
   const [artist, setArtist] = useState<Artist | null>(null);
+  const [channels, setChannels] = useState<AlbumChannelCredit[]>([]);
   const [songs, setSongs] = useState<Song[]>([]);
   const [songArtists, setSongArtists] = useState<Record<string, Artist>>({});
   const [songCredits, setSongCredits] = useState<Record<string, SongArtistCredit[]>>({});
@@ -58,15 +66,18 @@ export function AlbumDetailPage() {
         return;
       }
 
-      const [artistRes, songsRes] = await Promise.all([
+      const [artistRes, songsRes, channelsRes] = await Promise.all([
         row.artist_id ? getArtist(row.artist_id) : Promise.resolve({ data: null, error: null }),
         getSongsByAlbum(row.id),
+        getAlbumChannels(row.id),
       ]);
       if (cancelled) return;
       if (artistRes.error) setError(artistRes.error.message);
       if (songsRes.error) setError(songsRes.error.message);
+      if (channelsRes.error) setError(channelsRes.error.message);
       const fetchedArtist = (artistRes.data ?? null) as Artist | null;
       const fetchedSongs = (songsRes.data ?? []) as Song[];
+      setChannels((channelsRes.data ?? []) as AlbumChannelCredit[]);
       setArtist(fetchedArtist);
       setSongs(fetchedSongs);
 
@@ -164,6 +175,28 @@ export function AlbumDetailPage() {
             <div className="mt-4 space-y-1">
               <div className="text-lg font-bold text-text">{album.title}</div>
               <div className="text-sm text-muted">{artist?.name ?? "—"}</div>
+              {channels.length ? (
+                <div className="pt-2">
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {channels.map((c) => {
+                      const ch = creditChannel(c);
+                      const name = ch?.name ?? c.channel_id;
+                      const img = ch?.logo_path ? publicAssetUrl("logos", ch.logo_path) : null;
+                      return (
+                        <div
+                          key={`${c.channel_id}:${c.sort_order ?? 0}`}
+                          className="flex items-center gap-2 rounded-full border bg-panel2 px-3 py-2"
+                        >
+                          <div className="h-6 w-6 overflow-hidden rounded-full bg-panel">
+                            {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : null}
+                          </div>
+                          <div className="text-xs font-semibold text-text">{name}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
               {album.release_date ? (
                 <div className="pt-1 text-xs text-muted">{album.release_date}</div>
               ) : null}

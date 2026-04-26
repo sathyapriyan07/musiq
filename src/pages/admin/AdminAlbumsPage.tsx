@@ -8,12 +8,13 @@ import {
 } from "../../components/admin/AdminComponents";
 import { ErrorState } from "../../components/States";
 import { supabase } from "../../lib/supabaseClient";
-import type { AlbumRow, ArtistRow } from "../../admin/supabaseAdmin";
-import { listAlbums, listArtists } from "../../admin/supabaseAdmin";
+import type { AlbumRow, ArtistRow, ChannelRow } from "../../admin/supabaseAdmin";
+import { listAlbums, listArtists, listChannels } from "../../admin/supabaseAdmin";
 
 export function AdminAlbumsPage() {
   const [rows, setRows] = useState<AlbumRow[]>([]);
   const [artists, setArtists] = useState<Pick<ArtistRow, "id" | "name">[]>([]);
+  const [channels, setChannels] = useState<Pick<ChannelRow, "id" | "name">[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,11 +35,19 @@ export function AdminAlbumsPage() {
   const [albumArtists, setAlbumArtists] = useState<AlbumArtistFormRow[]>([]);
   const [albumArtistsLoading, setAlbumArtistsLoading] = useState(false);
 
+  type AlbumChannelFormRow = {
+    key: string;
+    channelId: string;
+  };
+
+  const [albumChannels, setAlbumChannels] = useState<AlbumChannelFormRow[]>([]);
+  const [albumChannelsLoading, setAlbumChannelsLoading] = useState(false);
+
   async function refresh() {
     setLoading(true);
     setError(null);
 
-    const [albumsRes, artistsRes] = await Promise.all([listAlbums(), listArtists()]);
+    const [albumsRes, artistsRes, channelsRes] = await Promise.all([listAlbums(), listArtists(), listChannels()]);
 
     if (albumsRes.error) setError(albumsRes.error.message);
     setRows((albumsRes.data ?? []) as AlbumRow[]);
@@ -48,6 +57,13 @@ export function AdminAlbumsPage() {
       setArtists([]);
     } else {
       setArtists(((artistsRes.data ?? []) as ArtistRow[]).map((a) => ({ id: a.id, name: a.name })));
+    }
+
+    if (channelsRes.error) {
+      setError(channelsRes.error.message);
+      setChannels([]);
+    } else {
+      setChannels(((channelsRes.data ?? []) as ChannelRow[]).map((c) => ({ id: c.id, name: c.name })));
     }
 
     setLoading(false);
@@ -144,6 +160,59 @@ export function AdminAlbumsPage() {
     return { normalizedAdditional };
   }
 
+  function normalizeAlbumChannels(input: AlbumChannelFormRow[]) {
+    const cleaned = input
+      .map((r) => ({ ...r, channelId: r.channelId.trim(), key: r.key || newKey() }))
+      .filter((r) => !!r.channelId);
+
+    const deduped: AlbumChannelFormRow[] = [];
+    const seen = new Set<string>();
+    for (const r of cleaned) {
+      if (seen.has(r.channelId)) continue;
+      seen.add(r.channelId);
+      deduped.push(r);
+    }
+    return deduped;
+  }
+
+  async function loadAlbumChannels(albumId: string) {
+    setAlbumChannelsLoading(true);
+    setError(null);
+    const res = await supabase
+      .from("album_channels")
+      .select("channel_id, sort_order")
+      .eq("album_id", albumId)
+      .order("sort_order", { ascending: true });
+
+    if (res.error) {
+      setAlbumChannels([]);
+      setAlbumChannelsLoading(false);
+      setError(res.error.message);
+      return;
+    }
+
+    const data = (res.data ?? []) as { channel_id: string; sort_order: number | null }[];
+    setAlbumChannels(data.map((r) => ({ key: newKey(), channelId: r.channel_id })));
+    setAlbumChannelsLoading(false);
+  }
+
+  async function syncAlbumChannels(albumId: string, toSave: AlbumChannelFormRow[]) {
+    const normalized = normalizeAlbumChannels(toSave);
+
+    const delRes = await supabase.from("album_channels").delete().eq("album_id", albumId);
+    if (delRes.error) throw delRes.error;
+
+    const toInsert: { album_id: string; channel_id: string; sort_order: number }[] = [];
+    for (let i = 0; i < normalized.length; i++) {
+      toInsert.push({ album_id: albumId, channel_id: normalized[i].channelId, sort_order: i });
+    }
+
+    if (toInsert.length) {
+      const insertRes = await supabase.from("album_channels").insert(toInsert);
+      if (insertRes.error) throw insertRes.error;
+    }
+  }
+
   function openCreate() {
     setEditing(null);
     setTitle("");
@@ -151,6 +220,7 @@ export function AdminAlbumsPage() {
     setReleaseDate("");
     setPublished(true);
     setAlbumArtists([]);
+    setAlbumChannels([]);
     setModalOpen(true);
   }
 
@@ -161,8 +231,10 @@ export function AdminAlbumsPage() {
     setReleaseDate(row.release_date ?? "");
     setPublished(row.is_published);
     setAlbumArtists([]);
+    setAlbumChannels([]);
     setModalOpen(true);
     void loadAlbumArtists(row.id, row.artist_id ?? null);
+    void loadAlbumChannels(row.id);
   }
 
   async function save() {
@@ -205,9 +277,10 @@ export function AdminAlbumsPage() {
     if (savedAlbumId) {
       try {
         await syncAlbumArtists(savedAlbumId, primary, additionalForSave);
+        await syncAlbumChannels(savedAlbumId, albumChannels);
       } catch (e) {
         setSubmitting(false);
-        setError(e instanceof Error ? e.message : "Failed to save album artists");
+        setError(e instanceof Error ? e.message : "Failed to save album relations");
         return;
       }
     }
@@ -387,6 +460,59 @@ export function AdminAlbumsPage() {
                     Add artist
                   </AdminButton>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">
+              Channels (rights)
+            </div>
+            <div className="space-y-2 rounded-xl border bg-panel p-3">
+              {albumChannelsLoading ? (
+                <div className="text-sm text-muted">Loading channels...</div>
+              ) : null}
+
+              {!albumChannelsLoading && !albumChannels.length ? (
+                <div className="text-sm text-muted">No channels assigned.</div>
+              ) : null}
+
+              {albumChannels.map((r) => (
+                <div key={r.key} className="grid gap-2 md:grid-cols-[1fr_44px] md:items-center">
+                  <select
+                    value={r.channelId}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setAlbumChannels((prev) =>
+                        prev.map((x) => (x.key === r.key ? { ...x, channelId: v } : x)),
+                      );
+                    }}
+                    className="h-11 w-full rounded-xl border bg-panel px-4 text-sm text-text outline-none"
+                  >
+                    <option value="">— Select channel —</option>
+                    {channels.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => setAlbumChannels((prev) => prev.filter((x) => x.key !== r.key))}
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-xl border bg-panel text-sm text-muted hover:bg-panel2"
+                    title="Remove"
+                    aria-label="Remove"
+                  >
+                    −
+                  </button>
+                </div>
+              ))}
+
+              <div className="flex justify-end">
+                <AdminButton onClick={() => setAlbumChannels((prev) => [...prev, { key: newKey(), channelId: "" }])}>
+                  Add channel
+                </AdminButton>
               </div>
             </div>
           </div>

@@ -18,6 +18,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/admin/songs", label: "Songs" },
   { to: "/admin/albums", label: "Albums" },
   { to: "/admin/artists", label: "Artists" },
+  { to: "/admin/channels", label: "Channels" },
   { to: "/admin/links", label: "Links" },
   { to: "/admin/music-rights", label: "Music Rights" },
   { to: "/admin/homepage-sections", label: "Homepage Sections" },
