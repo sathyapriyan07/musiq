@@ -17,7 +17,7 @@ function Panel({
   return (
     <div
       className={clsx(
-        "rounded-xl border bg-panel p-6 text-center",
+        "rounded-2xl border bg-panel p-6 text-center surface shadow-soft",
         className,
       )}
     >
@@ -37,4 +37,3 @@ export function EmptyState(props: StateProps) {
 export function ErrorState(props: StateProps) {
   return <Panel {...props} />;
 }
-

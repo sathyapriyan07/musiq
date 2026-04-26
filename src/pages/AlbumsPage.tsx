@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+
 import { MediaCard } from "../components/MediaCard";
+import { PageHeader } from "../components/Page";
 import { EmptyState, ErrorState } from "../components/States";
 import { publicAssetUrl } from "../lib/media";
 import { getAlbums, getArtists, type Album, type Artist } from "../lib/publicQueries";
@@ -16,7 +18,9 @@ export function AlbumsPage() {
     async function run() {
       if (!isSupabaseConfigured) {
         setLoading(false);
-        setError("Supabase is not configured (missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).");
+        setError(
+          "Supabase is not configured (missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).",
+        );
         return;
       }
       setLoading(true);
@@ -41,38 +45,41 @@ export function AlbumsPage() {
     return map;
   }, [artists]);
 
-  const cards = useMemo(() => {
-    return albums.map((a) => (
-      <MediaCard
-        key={a.id}
-        title={a.title}
-        subtitle={a.artist_id ? artistNameById.get(a.artist_id) ?? "—" : "—"}
-        aspect="poster"
-        to={`/albums/${a.id}`}
-        imageUrl={publicAssetUrl("covers", a.cover_path) ?? undefined}
-      />
-    ));
-  }, [albums, artistNameById]);
-
   return (
     <div className="space-y-5">
-      <div>
-        <div className="text-xl font-bold text-text">Albums</div>
-        <div className="text-xs text-muted">Cover art stored in Supabase Storage.</div>
-      </div>
+      <PageHeader
+        title="Albums"
+        subtitle="Artwork-forward browsing, Apple Music style."
+      />
 
       {loading ? (
-        <div className="rounded-xl border bg-panel p-6 text-sm text-muted">Loading…</div>
+        <div className="rounded-2xl border bg-panel p-6 text-sm text-muted surface shadow-soft">
+          Loading...
+        </div>
       ) : error ? (
         <ErrorState title="Failed to load albums" description={error} />
       ) : !albums.length ? (
         <EmptyState
           title="No albums found"
-          description="Import songs in Admin → Songs → Import iTunes, or add albums manually."
+          description="Import songs in Admin -> Songs -> Import iTunes, or add albums manually."
         />
       ) : (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">{cards}</div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+          {albums.map((a) => (
+            <MediaCard
+              key={a.id}
+              title={a.title}
+              subtitle={
+                a.artist_id ? artistNameById.get(a.artist_id) ?? "—" : "—"
+              }
+              aspect="poster"
+              to={`/albums/${a.id}`}
+              imageUrl={publicAssetUrl("covers", a.cover_path) ?? undefined}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
 }
+

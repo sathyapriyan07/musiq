@@ -30,7 +30,7 @@ function NavPill({ item, mobile }: { item: NavItem; mobile?: boolean }) {
       end={item.to === "/"}
       className={({ isActive }) =>
         clsx(
-          "inline-flex items-center whitespace-nowrap rounded-full border px-4 py-2 text-sm",
+          "inline-flex items-center whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold surface",
           mobile ? "h-9" : "h-10",
           isActive
             ? "border-transparent bg-panel2 text-text"
@@ -47,9 +47,13 @@ function DesktopSidebar({ items }: { items: NavItem[] }) {
   const { user, profile, isAdmin, profileAccessDenied, profileError } = useAuth();
 
   return (
-    <aside className="hidden md:fixed md:inset-y-0 md:left-0 md:flex md:w-[240px] md:flex-col md:border-r md:bg-panel">
-      <div className="px-5 py-5 text-lg font-semibold">ONL Music</div>
-      <nav className="flex flex-col gap-2 px-3">
+    <aside className="hidden md:fixed md:inset-y-0 md:left-0 md:flex md:w-[280px] md:flex-col md:border-r md:bg-panel surface">
+      <div className="px-6 py-6">
+        <div className="text-lg font-semibold tracking-tight text-text">ONL Music</div>
+        <div className="mt-1 text-xs text-muted">Listen • Discover • Curate</div>
+      </div>
+
+      <nav className="flex flex-col gap-1 px-3">
         {items.map((item) => (
           <NavLink
             key={item.to}
@@ -57,8 +61,10 @@ function DesktopSidebar({ items }: { items: NavItem[] }) {
             end={item.to === "/"}
             className={({ isActive }) =>
               clsx(
-                "rounded-lg px-3 py-2 text-sm",
-                isActive ? "bg-panel2 text-text" : "text-muted hover:bg-panel2",
+                "rounded-xl px-4 py-3 text-sm font-semibold",
+                isActive
+                  ? "bg-panel2 text-text shadow-soft"
+                  : "text-muted hover:bg-panel2 hover:text-text",
               )
             }
           >
@@ -66,6 +72,11 @@ function DesktopSidebar({ items }: { items: NavItem[] }) {
           </NavLink>
         ))}
       </nav>
+
+      <div className="mt-5 px-6">
+        <SearchBar placeholder="Search…" />
+      </div>
+
       <div className="mt-auto border-t px-5 py-4 text-sm text-muted">
         {user ? (
           <>
@@ -90,13 +101,13 @@ function DesktopSidebar({ items }: { items: NavItem[] }) {
             <div className="mt-3 flex gap-2">
               <Link
                 to="/login?mode=login"
-                className="inline-flex h-9 items-center justify-center rounded-full border bg-panel px-4 text-xs font-semibold text-text hover:bg-panel2"
+                className="inline-flex h-9 items-center justify-center rounded-full border bg-panel px-4 text-xs font-semibold text-text hover:bg-panel2 surface"
               >
                 Login
               </Link>
               <Link
                 to="/login?mode=signup"
-                className="inline-flex h-9 items-center justify-center rounded-full border bg-accent px-4 text-xs font-semibold text-black hover:opacity-90"
+                className="inline-flex h-9 items-center justify-center rounded-full border bg-[color:var(--accent)] px-4 text-xs font-semibold text-white hover:opacity-90"
               >
                 Sign up
               </Link>
@@ -112,49 +123,50 @@ function DesktopHeader({ items }: { items: NavItem[] }) {
   const { user, isAdmin, signOut, isLoading } = useAuth();
 
   return (
-    <header className="sticky top-0 z-30 hidden border-b bg-bg md:block">
-      <div className="flex items-center gap-3 px-6 py-4">
-        <div className="flex flex-wrap gap-2">
-          {items.map((item) => (
-            <NavPill key={item.to} item={item} />
-          ))}
-        </div>
-        <div className="ml-auto flex w-[520px] max-w-full items-center gap-2">
-          <SearchBar placeholder="Search songs, albums, artists…" />
-          {isAdmin ? (
-            <Link
-              to="/admin"
-              className="inline-flex h-10 items-center justify-center rounded-full border bg-panel px-4 text-sm font-semibold text-text hover:bg-panel2"
-            >
-              Admin Panel
-            </Link>
-          ) : null}
-          {!isLoading && !user ? (
-            <>
+    <header className="sticky top-0 z-30 hidden md:block">
+      <div className="border-b bg-panel/40 surface">
+        <div className="flex items-center gap-3 px-6 py-4">
+          <div className="flex flex-wrap gap-2">
+            {items.map((item) => (
+              <NavPill key={item.to} item={item} />
+            ))}
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            {isAdmin ? (
               <Link
-                to="/login?mode=login"
-                className="inline-flex h-10 items-center justify-center rounded-full border bg-panel px-4 text-sm font-semibold text-text hover:bg-panel2"
+                to="/admin"
+                className="inline-flex h-10 items-center justify-center rounded-full border bg-panel px-4 text-sm font-semibold text-text hover:bg-panel2 surface"
               >
-                Login
+                Admin Panel
               </Link>
-              <Link
-                to="/login?mode=signup"
-                className="inline-flex h-10 items-center justify-center rounded-full border bg-accent px-4 text-sm font-semibold text-black hover:opacity-90"
+            ) : null}
+            {!isLoading && !user ? (
+              <>
+                <Link
+                  to="/login?mode=login"
+                  className="inline-flex h-10 items-center justify-center rounded-full border bg-panel px-4 text-sm font-semibold text-text hover:bg-panel2 surface"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/login?mode=signup"
+                  className="inline-flex h-10 items-center justify-center rounded-full border bg-[color:var(--accent)] px-4 text-sm font-semibold text-white hover:opacity-90"
+                >
+                  Sign up
+                </Link>
+              </>
+            ) : null}
+            {!isLoading && user ? (
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                className="inline-flex h-10 items-center justify-center rounded-full border bg-panel px-4 text-sm font-semibold text-text hover:bg-panel2 surface"
               >
-                Sign up
-              </Link>
-            </>
-          ) : null}
-          {!isLoading && user ? (
-            <button
-              type="button"
-              onClick={() => void signOut()}
-              className="inline-flex h-10 items-center justify-center rounded-full border bg-panel px-4 text-sm font-semibold text-text hover:bg-panel2"
-            >
-              Logout
-            </button>
-          ) : null}
-          <ThemeToggle />
+                Logout
+              </button>
+            ) : null}
+            <ThemeToggle />
+          </div>
         </div>
       </div>
     </header>
@@ -172,7 +184,7 @@ function MobileHeader({ items }: { items: NavItem[] }) {
           {isAdmin ? (
             <Link
               to="/admin"
-              className="inline-flex h-10 items-center justify-center rounded-full border bg-panel px-4 text-sm font-semibold text-text hover:bg-panel2"
+              className="inline-flex h-10 items-center justify-center rounded-full border bg-panel px-4 text-sm font-semibold text-text hover:bg-panel2 surface"
             >
               Admin
             </Link>
@@ -180,7 +192,7 @@ function MobileHeader({ items }: { items: NavItem[] }) {
           {!isLoading && !user ? (
             <Link
               to="/login?mode=login"
-              className="inline-flex h-10 items-center justify-center rounded-full border bg-panel px-4 text-sm font-semibold text-text hover:bg-panel2"
+              className="inline-flex h-10 items-center justify-center rounded-full border bg-panel px-4 text-sm font-semibold text-text hover:bg-panel2 surface"
             >
               Login
             </Link>
@@ -189,7 +201,7 @@ function MobileHeader({ items }: { items: NavItem[] }) {
             <button
               type="button"
               onClick={() => void signOut()}
-              className="inline-flex h-10 items-center justify-center rounded-full border bg-panel px-4 text-sm font-semibold text-text hover:bg-panel2"
+              className="inline-flex h-10 items-center justify-center rounded-full border bg-panel px-4 text-sm font-semibold text-text hover:bg-panel2 surface"
             >
               Logout
             </button>
@@ -220,11 +232,11 @@ export function AppShell() {
     <div className="min-h-screen">
       <DesktopSidebar items={items} />
 
-      <div className="md:ml-[240px]">
+      <div className="md:ml-[280px]">
         <DesktopHeader items={items} />
         <MobileHeader items={items} />
 
-        <main className="px-4 py-6 md:px-6">
+        <main className="px-4 py-6 md:px-8">
           <Outlet />
         </main>
       </div>

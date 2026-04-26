@@ -54,7 +54,7 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={() => setTheme(nextTheme)}
-      className="inline-flex h-10 w-10 items-center justify-center rounded-full border bg-panel hover:bg-panel2"
+      className="inline-flex h-10 w-10 items-center justify-center rounded-full border bg-panel hover:bg-panel2 surface"
       aria-label={`Switch to ${nextTheme} mode`}
       title={`Switch to ${nextTheme} mode`}
     >
@@ -62,4 +62,3 @@ export function ThemeToggle() {
     </button>
   );
 }
-

@@ -13,6 +13,7 @@ type Props = {
   shape?: Shape;
   aspect?: Aspect;
   rightSlot?: ReactNode;
+  className?: string;
 };
 
 function aspectClass(aspect: Aspect) {
@@ -35,12 +36,18 @@ export function MediaCard({
   shape = "square",
   aspect = "square",
   rightSlot,
+  className,
 }: Props) {
   const content = (
-    <div className="group rounded-xl border bg-panel p-3 transition hover:bg-panel2">
+    <div
+      className={clsx(
+        "group rounded-2xl border bg-panel p-3 transition hover:bg-panel2 surface shadow-soft",
+        className,
+      )}
+    >
       <div
         className={clsx(
-          "w-full overflow-hidden bg-panel2",
+          "relative w-full overflow-hidden bg-panel2",
           aspectClass(aspect),
           shape === "round" ? "rounded-full" : "rounded-lg",
         )}
@@ -50,13 +57,19 @@ export function MediaCard({
             src={imageUrl}
             alt=""
             loading="lazy"
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted">
             <span className="text-xs uppercase tracking-wider">No Image</span>
           </div>
         )}
+
+        {shape !== "round" ? (
+          <div className="pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-100">
+            <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/30 to-transparent" />
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-3 flex items-start gap-3">
@@ -81,4 +94,3 @@ export function MediaCard({
 
   return content;
 }
-

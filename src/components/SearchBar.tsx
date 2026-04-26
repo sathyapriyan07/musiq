@@ -34,7 +34,7 @@ export function SearchBar({
   return (
     <div
       className={clsx(
-        "flex h-10 w-full items-center gap-2 rounded-full border bg-panel px-4",
+        "flex h-10 w-full items-center gap-2 rounded-full border bg-panel px-4 surface",
         className,
       )}
     >
@@ -48,4 +48,3 @@ export function SearchBar({
     </div>
   );
 }
-

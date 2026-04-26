@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { MediaCard } from "../components/MediaCard";
-import { SearchBar } from "../components/SearchBar";
-import { ViewToggle, type ViewMode } from "../components/ViewToggle";
-import { EmptyState, ErrorState } from "../components/States";
 import { Link } from "react-router-dom";
+
+import { MediaCard } from "../components/MediaCard";
+import { PageHeader } from "../components/Page";
+import { SearchBar } from "../components/SearchBar";
+import { EmptyState, ErrorState } from "../components/States";
+import { ViewToggle, type ViewMode } from "../components/ViewToggle";
+import { publicAssetUrl } from "../lib/media";
 import {
   getAlbums,
   getArtists,
@@ -13,7 +16,6 @@ import {
   type Song,
 } from "../lib/publicQueries";
 import { isSupabaseConfigured } from "../lib/supabaseClient";
-import { publicAssetUrl } from "../lib/media";
 
 export function SongsPage() {
   const [view, setView] = useState<ViewMode>("grid");
@@ -30,7 +32,9 @@ export function SongsPage() {
     async function run() {
       if (!isSupabaseConfigured) {
         setLoading(false);
-        setError("Supabase is not configured (missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).");
+        setError(
+          "Supabase is not configured (missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).",
+        );
         return;
       }
       setLoading(true);
@@ -80,7 +84,9 @@ export function SongsPage() {
     const q = query.trim().toLowerCase();
     if (!q) return songs;
     return songs.filter((s) => {
-      const artistName = s.primary_artist_id ? artistNameById.get(s.primary_artist_id) ?? "" : "";
+      const artistName = s.primary_artist_id
+        ? artistNameById.get(s.primary_artist_id) ?? ""
+        : "";
       const albumTitle = s.album_id ? albumTitleById.get(s.album_id) ?? "" : "";
       return (
         s.title.toLowerCase().includes(q) ||
@@ -92,29 +98,31 @@ export function SongsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center">
-        <div>
-          <div className="text-xl font-bold text-text">Songs</div>
-          <div className="text-xs text-muted">Search via Supabase `ilike`.</div>
-        </div>
-        <div className="md:ml-auto flex w-full items-center gap-2 md:w-[520px]">
-          <SearchBar
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search songs…"
-          />
-          <ViewToggle value={view} onChange={setView} />
-        </div>
-      </div>
+      <PageHeader
+        title="Songs"
+        subtitle="Browse your imported tracks."
+        right={
+          <div className="flex w-full items-center gap-2 md:w-[520px]">
+            <SearchBar
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search songs..."
+            />
+            <ViewToggle value={view} onChange={setView} />
+          </div>
+        }
+      />
 
       {loading ? (
-        <div className="rounded-xl border bg-panel p-6 text-sm text-muted">Loading…</div>
+        <div className="rounded-2xl border bg-panel p-6 text-sm text-muted surface shadow-soft">
+          Loading...
+        </div>
       ) : error ? (
         <ErrorState title="Failed to load songs" description={error} />
       ) : !songs.length ? (
         <EmptyState
           title="No songs found"
-          description="Import songs in Admin → Songs → Import iTunes, or add songs manually."
+          description="Import songs in Admin -> Songs -> Import iTunes, or add songs manually."
         />
       ) : !filtered.length ? (
         <EmptyState title="No matches" description="Try a different query." />
@@ -137,25 +145,30 @@ export function SongsPage() {
           ))}
         </div>
       ) : (
-        <div className="divide-y rounded-xl border bg-panel">
+        <div className="divide-y rounded-2xl border bg-panel surface shadow-soft">
           {filtered.map((song) => {
             const artistName = song.primary_artist_id
               ? artistNameById.get(song.primary_artist_id) ?? "—"
               : "—";
-            const albumTitle = song.album_id ? albumTitleById.get(song.album_id) ?? "" : "";
-            const cover = song.album_id ? albumCoverById.get(song.album_id) : undefined;
+            const albumTitle = song.album_id
+              ? albumTitleById.get(song.album_id) ?? ""
+              : "";
+            const cover = song.album_id
+              ? albumCoverById.get(song.album_id)
+              : undefined;
             return (
               <div key={song.id} className="flex items-center gap-3 px-4 py-3">
                 {cover ? (
                   <img
                     src={cover}
                     alt=""
-                    className="h-10 w-10 rounded-lg border object-cover"
+                    className="h-10 w-10 rounded-xl border object-cover"
                     loading="lazy"
                   />
                 ) : (
-                  <div className="h-10 w-10 rounded-lg bg-panel2" />
+                  <div className="h-10 w-10 rounded-xl bg-panel2" />
                 )}
+
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold text-text">
                     {song.title}
@@ -165,9 +178,10 @@ export function SongsPage() {
                     {albumTitle ? ` · ${albumTitle}` : ""}
                   </div>
                 </div>
+
                 <Link
                   to={`/songs/${song.id}`}
-                  className="ml-auto text-xs font-semibold text-accent"
+                  className="ml-auto text-xs font-semibold text-[color:var(--accent)]"
                 >
                   Open
                 </Link>
@@ -179,3 +193,4 @@ export function SongsPage() {
     </div>
   );
 }
+

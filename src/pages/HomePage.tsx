@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { MediaCard } from "../components/MediaCard";
 import { EmptyState, ErrorState } from "../components/States";
+import { PageHeader, SectionHeader } from "../components/Page";
 import { publicAssetUrl } from "../lib/media";
 import { getAlbums, getArtists, getSongs, type Album, type Artist, type Song } from "../lib/publicQueries";
 import { isSupabaseConfigured } from "../lib/supabaseClient";
@@ -56,6 +57,7 @@ export function HomePage() {
         subtitle="Song"
         to={`/songs/${s.id}`}
         imageUrl={s.album_id ? coverByAlbumId.get(s.album_id) : undefined}
+        className="w-[220px] shrink-0"
       />
     ));
   }, [albums, songs]);
@@ -69,6 +71,7 @@ export function HomePage() {
         aspect="poster"
         to={`/albums/${a.id}`}
         imageUrl={publicAssetUrl("covers", a.cover_path) ?? undefined}
+        className="w-[190px] shrink-0"
       />
     ));
   }, [albums]);
@@ -82,21 +85,41 @@ export function HomePage() {
         shape="round"
         to={`/artists/${a.id}`}
         imageUrl={publicAssetUrl("avatars", a.image_path) ?? undefined}
+        className="w-[160px] shrink-0"
       />
     ));
   }, [artists]);
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border bg-panel p-6">
-        <div className="text-2xl font-bold text-text">Welcome to ONL Music</div>
-        <div className="mt-2 text-sm text-muted">
-          Spotify-inspired UI + Supabase backend (Auth, Storage, RLS).
+      <PageHeader
+        title="Listen Now"
+        subtitle="Your imported catalog, with an Apple Music-like layout."
+      />
+
+      <div className="relative overflow-hidden rounded-3xl border bg-panel p-6 surface shadow-soft">
+        <div className="absolute inset-0 opacity-60">
+          <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-[color:var(--accent)] blur-3xl" />
+          <div className="absolute -right-24 -bottom-24 h-72 w-72 rounded-full bg-[color:var(--accent2)] blur-3xl" />
+        </div>
+        <div className="relative">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted">
+            ONL Music
+          </div>
+          <div className="mt-2 text-3xl font-bold tracking-tight text-text">
+            Built for discovery
+          </div>
+          <div className="mt-2 max-w-2xl text-sm text-muted">
+            Import tracks from iTunes in the Admin panel. Album artwork will appear automatically on
+            song cards and album pages.
+          </div>
         </div>
       </div>
 
       {loading ? (
-        <div className="rounded-xl border bg-panel p-6 text-sm text-muted">Loading…</div>
+        <div className="rounded-2xl border bg-panel p-6 text-sm text-muted surface shadow-soft">
+          Loading…
+        </div>
       ) : error ? (
         <ErrorState title="Failed to load homepage" description={error} />
       ) : !songs.length && !albums.length && !artists.length ? (
@@ -108,31 +131,28 @@ export function HomePage() {
         <>
           {songs.length ? (
             <section className="space-y-3">
-              <div>
-                <div className="text-sm font-semibold text-text">Latest Songs</div>
-                <div className="text-xs text-muted">Imported from iTunes.</div>
+              <SectionHeader title="Latest Songs" subtitle="Imported from iTunes." />
+              <div className="no-scrollbar flex gap-3 overflow-x-auto pb-2">
+                {songCards}
               </div>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{songCards}</div>
             </section>
           ) : null}
 
           {albums.length ? (
             <section className="space-y-3">
-              <div>
-                <div className="text-sm font-semibold text-text">Latest Albums</div>
-                <div className="text-xs text-muted">From your catalog.</div>
+              <SectionHeader title="Albums" subtitle="From your catalog." />
+              <div className="no-scrollbar flex gap-3 overflow-x-auto pb-2">
+                {albumCards}
               </div>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-5">{albumCards}</div>
             </section>
           ) : null}
 
           {artists.length ? (
             <section className="space-y-3">
-              <div>
-                <div className="text-sm font-semibold text-text">Artists</div>
-                <div className="text-xs text-muted">From your catalog.</div>
+              <SectionHeader title="Artists" subtitle="From your catalog." />
+              <div className="no-scrollbar flex gap-3 overflow-x-auto pb-2">
+                {artistCards}
               </div>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-6">{artistCards}</div>
             </section>
           ) : null}
         </>

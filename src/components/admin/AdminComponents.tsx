@@ -18,10 +18,10 @@ export function AdminButton({
 }) {
   const variantClass =
     variant === "primary"
-      ? "bg-accent text-black hover:opacity-90"
+      ? "bg-[color:var(--accent)] text-white hover:opacity-90"
       : variant === "danger"
         ? "bg-red-500 text-white hover:opacity-90"
-        : "bg-transparent text-text hover:bg-panel2";
+        : "bg-panel text-text hover:bg-panel2 surface";
 
   return (
     <button
@@ -29,7 +29,7 @@ export function AdminButton({
       onClick={onClick}
       disabled={disabled}
       className={clsx(
-        "inline-flex h-10 items-center justify-center rounded-full border px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
+        "inline-flex h-10 items-center justify-center rounded-full border px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 shadow-soft",
         variantClass,
       )}
     >
@@ -46,7 +46,7 @@ export function AdminEmpty({
   description?: string;
 }) {
   return (
-    <div className="rounded-xl border bg-panel p-10 text-center">
+    <div className="rounded-2xl border bg-panel p-10 text-center surface shadow-soft">
       <div className="text-base font-semibold text-text">{title}</div>
       {description ? <div className="mt-2 text-sm text-muted">{description}</div> : null}
     </div>
@@ -63,7 +63,7 @@ export function AdminCard({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border bg-panel">
+    <div className="rounded-2xl border bg-panel surface shadow-soft">
       <div className="flex items-center gap-3 border-b px-5 py-4">
         <div className="text-sm font-semibold text-text">{title}</div>
         {action ? <div className="ml-auto">{action}</div> : null}
@@ -92,13 +92,13 @@ export function AdminModal({
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
       <div className="absolute inset-0 flex items-start justify-center p-4 md:p-10">
-        <div className="w-full max-w-3xl overflow-hidden rounded-2xl border bg-panel">
+        <div className="w-full max-w-3xl overflow-hidden rounded-2xl border bg-panel surface shadow-soft">
           <div className="flex items-center gap-3 border-b px-5 py-4">
             <div className="text-sm font-semibold text-text">{title}</div>
             <button
               type="button"
               onClick={onClose}
-              className="ml-auto inline-flex h-10 w-10 items-center justify-center rounded-full border bg-panel hover:bg-panel2"
+              className="ml-auto inline-flex h-10 w-10 items-center justify-center rounded-full border bg-panel hover:bg-panel2 surface"
               aria-label="Close"
               title="Close"
             >
@@ -158,4 +158,3 @@ export function DataTable<Row>({
     </div>
   );
 }
-
