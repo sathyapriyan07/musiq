@@ -41,6 +41,15 @@ export function AdminSongsPage() {
   const [published, setPublished] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  type SongArtistFormRow = {
+    key: string;
+    artistId: string;
+    role: string;
+  };
+
+  const [songArtists, setSongArtists] = useState<SongArtistFormRow[]>([]);
+  const [songArtistsLoading, setSongArtistsLoading] = useState(false);
+
   const [importOpen, setImportOpen] = useState(false);
   const [importTerm, setImportTerm] = useState("");
   const [importResults, setImportResults] = useState<ItunesTrack[]>([]);
@@ -82,6 +91,103 @@ export function AdminSongsPage() {
     void refresh();
   }, []);
 
+  function newKey() {
+    return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  }
+
+  function normalizeAdditionalSongArtists(input: SongArtistFormRow[], primary: string | null) {
+    const cleaned = input
+      .map((r) => ({
+        ...r,
+        artistId: r.artistId.trim(),
+        role: r.role.trim(),
+        key: r.key || newKey(),
+      }))
+      .filter((r) => !!r.artistId);
+
+    const withoutPrimary = primary ? cleaned.filter((r) => r.artistId !== primary) : cleaned;
+
+    const deduped: SongArtistFormRow[] = [];
+    const seen = new Set<string>();
+    for (const r of withoutPrimary) {
+      if (seen.has(r.artistId)) continue;
+      seen.add(r.artistId);
+      deduped.push(r);
+    }
+
+    return deduped;
+  }
+
+  async function loadSongArtists(songId: string, fallbackPrimary: string | null) {
+    setSongArtistsLoading(true);
+    setError(null);
+    const res = await supabase
+      .from("song_artists")
+      .select("artist_id, role, sort_order")
+      .eq("song_id", songId)
+      .order("sort_order", { ascending: true });
+
+    if (res.error) {
+      setSongArtists([]);
+      setSongArtistsLoading(false);
+      setError(res.error.message);
+      return;
+    }
+
+    const data = (res.data ?? []) as {
+      artist_id: string;
+      role: string | null;
+      sort_order: number | null;
+    }[];
+
+    if (!data.length) {
+      setSongArtists([]);
+      setSongArtistsLoading(false);
+      return;
+    }
+
+    setSongArtists(
+      data
+        .filter((r) => (fallbackPrimary ? r.artist_id !== fallbackPrimary : true))
+        .map((r) => ({
+          key: newKey(),
+          artistId: r.artist_id,
+          role: r.role ?? "",
+        })),
+    );
+    setSongArtistsLoading(false);
+  }
+
+  async function syncSongArtists(
+    songId: string,
+    primary: string | null,
+    additionalToSave: SongArtistFormRow[],
+  ) {
+    const normalizedAdditional = normalizeAdditionalSongArtists(additionalToSave, primary);
+
+    const delRes = await supabase.from("song_artists").delete().eq("song_id", songId);
+    if (delRes.error) throw delRes.error;
+
+    const toInsert: { song_id: string; artist_id: string; role: string | null; sort_order: number }[] = [];
+    if (primary) {
+      toInsert.push({ song_id: songId, artist_id: primary, role: "Primary", sort_order: 0 });
+    }
+    for (let i = 0; i < normalizedAdditional.length; i++) {
+      const r = normalizedAdditional[i];
+      toInsert.push({
+        song_id: songId,
+        artist_id: r.artistId,
+        role: r.role || null,
+        sort_order: (primary ? 1 : 0) + i,
+      });
+    }
+
+    if (toInsert.length) {
+      const insertRes = await supabase.from("song_artists").insert(toInsert);
+      if (insertRes.error) throw insertRes.error;
+    }
+  }
+
   function openCreate() {
     setEditing(null);
     setTitle("");
@@ -92,6 +198,7 @@ export function AdminSongsPage() {
     setPreviewUrl("");
     setYoutubeUrl("");
     setPublished(true);
+    setSongArtists([]);
     setModalOpen(true);
   }
 
@@ -105,7 +212,9 @@ export function AdminSongsPage() {
     setPreviewUrl(row.preview_url ?? "");
     setYoutubeUrl(row.youtube_url ?? "");
     setPublished(row.is_published);
+    setSongArtists([]);
     setModalOpen(true);
+    void loadSongArtists(row.id, row.primary_artist_id ?? null);
   }
 
   async function save() {
@@ -130,17 +239,29 @@ export function AdminSongsPage() {
     }
 
     const res = editing
-      ? await supabase.from("songs").update(payload).eq("id", editing.id)
-      : await supabase.from("songs").insert(payload);
+      ? await supabase.from("songs").update(payload).eq("id", editing.id).select("id").single()
+      : await supabase.from("songs").insert(payload).select("id").single();
 
-    setSubmitting(false);
     if (res.error) {
+      setSubmitting(false);
       setError(res.error.message);
       return;
     }
 
+    const songId = (res.data as { id: string } | null)?.id ?? editing?.id ?? null;
+    if (songId) {
+      try {
+        await syncSongArtists(songId, primaryArtistId || null, songArtists);
+      } catch (e) {
+        setSubmitting(false);
+        setError(e instanceof Error ? e.message : "Failed to save song artists");
+        return;
+      }
+    }
+
     setModalOpen(false);
     await refresh();
+    setSubmitting(false);
   }
 
   async function remove(row: SongRow) {
@@ -174,6 +295,14 @@ export function AdminSongsPage() {
       const artistId = await ensureArtistByName(track.artistName);
       const albumId = track.collectionName ? await ensureAlbum(track.collectionName, artistId) : null;
       const durationSeconds = track.trackTimeMillis ? Math.round(track.trackTimeMillis / 1000) : null;
+
+      if (albumId) {
+        const albumRelRes = await supabase.from("album_artists").upsert(
+          [{ album_id: albumId, artist_id: artistId, sort_order: 0 }],
+          { onConflict: "album_id,artist_id" },
+        );
+        if (albumRelRes.error) throw albumRelRes.error;
+      }
 
       if (albumId && track.artworkUrl100) {
         const artworkUrl = toItunesHiResArtwork(track.artworkUrl100);
@@ -209,8 +338,17 @@ export function AdminSongsPage() {
         is_published: true,
       };
 
-      const res = await supabase.from("songs").insert(payload);
+      const res = await supabase.from("songs").insert(payload).select("id").single();
       if (res.error) throw res.error;
+
+      const songId = (res.data as { id: string } | null)?.id ?? null;
+      if (songId) {
+        const relRes = await supabase.from("song_artists").upsert(
+          [{ song_id: songId, artist_id: artistId, role: "Primary", sort_order: 0 }],
+          { onConflict: "song_id,artist_id" },
+        );
+        if (relRes.error) throw relRes.error;
+      }
       await refresh();
     } catch (e) {
       setImportError(e instanceof Error ? e.message : "Import failed");
@@ -332,7 +470,7 @@ export function AdminSongsPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">
-                Artist
+                Primary artist
               </div>
               <select
                 value={primaryArtistId}
@@ -346,6 +484,78 @@ export function AdminSongsPage() {
                   </option>
                 ))}
               </select>
+
+              <div className="mt-3">
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">
+                  Additional artists (with roles)
+                </div>
+                <div className="space-y-2 rounded-xl border bg-panel p-3">
+                  {songArtistsLoading ? (
+                    <div className="text-sm text-muted">Loading artists...</div>
+                  ) : null}
+
+                  {!songArtistsLoading && !songArtists.length ? (
+                    <div className="text-sm text-muted">No additional artists.</div>
+                  ) : null}
+
+                  {songArtists.map((r) => (
+                    <div
+                      key={r.key}
+                      className="grid gap-2 md:grid-cols-[1fr_1fr_44px] md:items-center"
+                    >
+                      <select
+                        value={r.artistId}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setSongArtists((prev) =>
+                            prev.map((x) => (x.key === r.key ? { ...x, artistId: v } : x)),
+                          );
+                        }}
+                        className="h-11 w-full rounded-xl border bg-panel px-4 text-sm text-text outline-none"
+                      >
+                        <option value="">â€” Select artist â€”</option>
+                        {artists.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <input
+                        value={r.role}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setSongArtists((prev) =>
+                            prev.map((x) => (x.key === r.key ? { ...x, role: v } : x)),
+                          );
+                        }}
+                        className="h-11 w-full rounded-xl border bg-panel px-4 text-sm text-text outline-none"
+                        placeholder="Role (e.g. Featured, Producer)"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => setSongArtists((prev) => prev.filter((x) => x.key !== r.key))}
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-xl border bg-panel text-sm text-muted hover:bg-panel2"
+                        title="Remove"
+                        aria-label="Remove"
+                      >
+                        âˆ’
+                      </button>
+                    </div>
+                  ))}
+
+                  <div className="flex justify-end">
+                    <AdminButton
+                      onClick={() =>
+                        setSongArtists((prev) => [...prev, { key: newKey(), artistId: "", role: "" }])
+                      }
+                    >
+                      Add artist
+                    </AdminButton>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div>

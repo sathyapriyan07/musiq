@@ -26,6 +26,14 @@ export function AdminAlbumsPage() {
   const [published, setPublished] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  type AlbumArtistFormRow = {
+    key: string;
+    artistId: string;
+  };
+
+  const [albumArtists, setAlbumArtists] = useState<AlbumArtistFormRow[]>([]);
+  const [albumArtistsLoading, setAlbumArtistsLoading] = useState(false);
+
   async function refresh() {
     setLoading(true);
     setError(null);
@@ -49,12 +57,100 @@ export function AdminAlbumsPage() {
     void refresh();
   }, []);
 
+  function newKey() {
+    return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  }
+
+  function normalizeAdditionalAlbumArtists(input: AlbumArtistFormRow[], primary: string | null) {
+    const cleaned = input
+      .map((r) => ({
+        ...r,
+        artistId: r.artistId.trim(),
+        key: r.key || newKey(),
+      }))
+      .filter((r) => !!r.artistId);
+
+    const withoutPrimary = primary ? cleaned.filter((r) => r.artistId !== primary) : cleaned;
+
+    const deduped: AlbumArtistFormRow[] = [];
+    const seen = new Set<string>();
+    for (const r of withoutPrimary) {
+      if (seen.has(r.artistId)) continue;
+      seen.add(r.artistId);
+      deduped.push(r);
+    }
+
+    return deduped;
+  }
+
+  async function loadAlbumArtists(albumId: string, fallbackPrimary: string | null) {
+    setAlbumArtistsLoading(true);
+    setError(null);
+    const res = await supabase
+      .from("album_artists")
+      .select("artist_id, sort_order")
+      .eq("album_id", albumId)
+      .order("sort_order", { ascending: true });
+
+    if (res.error) {
+      setAlbumArtists([]);
+      setAlbumArtistsLoading(false);
+      setError(res.error.message);
+      return;
+    }
+
+    const data = (res.data ?? []) as { artist_id: string; sort_order: number | null }[];
+    if (!data.length) {
+      setAlbumArtists([]);
+      setAlbumArtistsLoading(false);
+      return;
+    }
+
+    setAlbumArtists(
+      data
+        .filter((r) => (fallbackPrimary ? r.artist_id !== fallbackPrimary : true))
+        .map((r) => ({ key: newKey(), artistId: r.artist_id })),
+    );
+    setAlbumArtistsLoading(false);
+  }
+
+  async function syncAlbumArtists(
+    albumId: string,
+    primary: string | null,
+    additionalToSave: AlbumArtistFormRow[],
+  ) {
+    const normalizedAdditional = normalizeAdditionalAlbumArtists(additionalToSave, primary);
+
+    const delRes = await supabase.from("album_artists").delete().eq("album_id", albumId);
+    if (delRes.error) throw delRes.error;
+
+    const toInsert: { album_id: string; artist_id: string; sort_order: number }[] = [];
+    if (primary) {
+      toInsert.push({ album_id: albumId, artist_id: primary, sort_order: 0 });
+    }
+    for (let i = 0; i < normalizedAdditional.length; i++) {
+      toInsert.push({
+        album_id: albumId,
+        artist_id: normalizedAdditional[i].artistId,
+        sort_order: (primary ? 1 : 0) + i,
+      });
+    }
+
+    if (toInsert.length) {
+      const insertRes = await supabase.from("album_artists").insert(toInsert);
+      if (insertRes.error) throw insertRes.error;
+    }
+
+    return { normalizedAdditional };
+  }
+
   function openCreate() {
     setEditing(null);
     setTitle("");
     setArtistId("");
     setReleaseDate("");
     setPublished(true);
+    setAlbumArtists([]);
     setModalOpen(true);
   }
 
@@ -64,16 +160,27 @@ export function AdminAlbumsPage() {
     setArtistId(row.artist_id ?? "");
     setReleaseDate(row.release_date ?? "");
     setPublished(row.is_published);
+    setAlbumArtists([]);
     setModalOpen(true);
+    void loadAlbumArtists(row.id, row.artist_id ?? null);
   }
 
   async function save() {
     setSubmitting(true);
     setError(null);
 
+    let primary = artistId.trim() || null;
+    let additionalForSave = albumArtists;
+
+    const normalizedAdditional = normalizeAdditionalAlbumArtists(albumArtists, primary);
+    if (!primary && normalizedAdditional.length) {
+      primary = normalizedAdditional[0].artistId;
+      additionalForSave = normalizedAdditional.slice(1);
+    }
+
     const payload = {
       title: title.trim(),
-      artist_id: artistId || null,
+      artist_id: primary,
       release_date: releaseDate || null,
       is_published: published,
     };
@@ -85,17 +192,29 @@ export function AdminAlbumsPage() {
     }
 
     const res = editing
-      ? await supabase.from("albums").update(payload).eq("id", editing.id)
-      : await supabase.from("albums").insert(payload);
+      ? await supabase.from("albums").update(payload).eq("id", editing.id).select("id").single()
+      : await supabase.from("albums").insert(payload).select("id").single();
 
-    setSubmitting(false);
     if (res.error) {
+      setSubmitting(false);
       setError(res.error.message);
       return;
     }
 
+    const savedAlbumId = (res.data as { id: string } | null)?.id ?? editing?.id ?? null;
+    if (savedAlbumId) {
+      try {
+        await syncAlbumArtists(savedAlbumId, primary, additionalForSave);
+      } catch (e) {
+        setSubmitting(false);
+        setError(e instanceof Error ? e.message : "Failed to save album artists");
+        return;
+      }
+    }
+
     setModalOpen(false);
     await refresh();
+    setSubmitting(false);
   }
 
   async function remove(row: AlbumRow) {
@@ -196,7 +315,7 @@ export function AdminAlbumsPage() {
 
           <div>
             <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">
-              Artist
+              Primary artist
             </div>
             <select
               value={artistId}
@@ -210,6 +329,66 @@ export function AdminAlbumsPage() {
                 </option>
               ))}
             </select>
+
+            <div className="mt-3">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">
+                Additional artists
+              </div>
+              <div className="space-y-2 rounded-xl border bg-panel p-3">
+                {albumArtistsLoading ? (
+                  <div className="text-sm text-muted">Loading artists...</div>
+                ) : null}
+
+                {!albumArtistsLoading && !albumArtists.length ? (
+                  <div className="text-sm text-muted">No additional artists.</div>
+                ) : null}
+
+                {albumArtists.map((r) => (
+                  <div
+                    key={r.key}
+                    className="grid gap-2 md:grid-cols-[1fr_44px] md:items-center"
+                  >
+                    <select
+                      value={r.artistId}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setAlbumArtists((prev) =>
+                          prev.map((x) => (x.key === r.key ? { ...x, artistId: v } : x)),
+                        );
+                      }}
+                      className="h-11 w-full rounded-xl border bg-panel px-4 text-sm text-text outline-none"
+                    >
+                      <option value="">â€” Select artist â€”</option>
+                      {artists.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={() => setAlbumArtists((prev) => prev.filter((x) => x.key !== r.key))}
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-xl border bg-panel text-sm text-muted hover:bg-panel2"
+                      title="Remove"
+                      aria-label="Remove"
+                    >
+                      âˆ’
+                    </button>
+                  </div>
+                ))}
+
+                <div className="flex justify-end">
+                  <AdminButton
+                    onClick={() =>
+                      setAlbumArtists((prev) => [...prev, { key: newKey(), artistId: "" }])
+                    }
+                  >
+                    Add artist
+                  </AdminButton>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div>
