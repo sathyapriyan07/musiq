@@ -18,3 +18,9 @@ Admin supports:
 
 Create the join tables by running `supabase/join_tables.sql` in the Supabase SQL editor.
 
+### Song streaming links
+
+Admin can store Spotify / Apple Music / YouTube Music / JioSaavn links in `song_links` with:
+
+- `category = 'official'`
+- `platform` = one of `Spotify`, `Apple Music`, `YouTube Music`, `JioSaavn`

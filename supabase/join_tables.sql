@@ -13,6 +13,30 @@ create table if not exists public.song_artists (
 create index if not exists song_artists_song_id_sort_order_idx
   on public.song_artists (song_id, sort_order);
 
+alter table public.song_artists enable row level security;
+
+drop policy if exists "Admins can manage song artists" on public.song_artists;
+
+create policy "Admins can manage song artists"
+  on public.song_artists
+  for all
+  using (
+    exists (
+      select 1
+      from public.profiles p
+      where p.id = auth.uid()
+        and p.is_admin = true
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles p
+      where p.id = auth.uid()
+        and p.is_admin = true
+    )
+  );
+
 create table if not exists public.album_artists (
   album_id uuid not null references public.albums(id) on delete cascade,
   artist_id uuid not null references public.artists(id) on delete cascade,
@@ -24,3 +48,26 @@ create table if not exists public.album_artists (
 create index if not exists album_artists_album_id_sort_order_idx
   on public.album_artists (album_id, sort_order);
 
+alter table public.album_artists enable row level security;
+
+drop policy if exists "Admins can manage album artists" on public.album_artists;
+
+create policy "Admins can manage album artists"
+  on public.album_artists
+  for all
+  using (
+    exists (
+      select 1
+      from public.profiles p
+      where p.id = auth.uid()
+        and p.is_admin = true
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles p
+      where p.id = auth.uid()
+        and p.is_admin = true
+    )
+  );

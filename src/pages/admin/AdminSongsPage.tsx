@@ -50,6 +50,11 @@ export function AdminSongsPage() {
   const [songArtists, setSongArtists] = useState<SongArtistFormRow[]>([]);
   const [songArtistsLoading, setSongArtistsLoading] = useState(false);
 
+  const [spotifyUrl, setSpotifyUrl] = useState("");
+  const [appleMusicUrl, setAppleMusicUrl] = useState("");
+  const [youtubeMusicUrl, setYoutubeMusicUrl] = useState("");
+  const [jioSaavnUrl, setJioSaavnUrl] = useState("");
+
   const [importOpen, setImportOpen] = useState(false);
   const [importTerm, setImportTerm] = useState("");
   const [importResults, setImportResults] = useState<ItunesTrack[]>([]);
@@ -188,6 +193,60 @@ export function AdminSongsPage() {
     }
   }
 
+  async function loadStreamingLinks(songId: string) {
+    setError(null);
+    const res = await supabase
+      .from("song_links")
+      .select("category, platform, url")
+      .eq("song_id", songId);
+
+    if (res.error) {
+      setError(res.error.message);
+      return;
+    }
+
+    const rows = (res.data ?? []) as { category: string; platform: string; url: string }[];
+    const official = rows.filter((r) => r.category === "official");
+
+    const byPlatform = new Map<string, string>();
+    for (const r of official) byPlatform.set(r.platform, r.url);
+
+    setSpotifyUrl(byPlatform.get("Spotify") ?? "");
+    setAppleMusicUrl(byPlatform.get("Apple Music") ?? "");
+    setYoutubeMusicUrl(byPlatform.get("YouTube Music") ?? "");
+    setJioSaavnUrl(byPlatform.get("JioSaavn") ?? "");
+  }
+
+  async function syncStreamingLinks(songId: string) {
+    const platforms = ["Spotify", "Apple Music", "YouTube Music", "JioSaavn"];
+
+    const delRes = await supabase
+      .from("song_links")
+      .delete()
+      .eq("song_id", songId)
+      .eq("category", "official")
+      .in("platform", platforms);
+    if (delRes.error) throw delRes.error;
+
+    const toInsert: { song_id: string; category: string; platform: string; url: string }[] = [];
+    const items: { platform: string; url: string }[] = [
+      { platform: "Spotify", url: spotifyUrl.trim() },
+      { platform: "Apple Music", url: appleMusicUrl.trim() },
+      { platform: "YouTube Music", url: youtubeMusicUrl.trim() },
+      { platform: "JioSaavn", url: jioSaavnUrl.trim() },
+    ];
+
+    for (const it of items) {
+      if (!it.url) continue;
+      toInsert.push({ song_id: songId, category: "official", platform: it.platform, url: it.url });
+    }
+
+    if (toInsert.length) {
+      const insRes = await supabase.from("song_links").insert(toInsert);
+      if (insRes.error) throw insRes.error;
+    }
+  }
+
   function openCreate() {
     setEditing(null);
     setTitle("");
@@ -197,6 +256,10 @@ export function AdminSongsPage() {
     setDurationSeconds("");
     setPreviewUrl("");
     setYoutubeUrl("");
+    setSpotifyUrl("");
+    setAppleMusicUrl("");
+    setYoutubeMusicUrl("");
+    setJioSaavnUrl("");
     setPublished(true);
     setSongArtists([]);
     setModalOpen(true);
@@ -211,10 +274,15 @@ export function AdminSongsPage() {
     setDurationSeconds(row.duration_seconds ? String(row.duration_seconds) : "");
     setPreviewUrl(row.preview_url ?? "");
     setYoutubeUrl(row.youtube_url ?? "");
+    setSpotifyUrl("");
+    setAppleMusicUrl("");
+    setYoutubeMusicUrl("");
+    setJioSaavnUrl("");
     setPublished(row.is_published);
     setSongArtists([]);
     setModalOpen(true);
     void loadSongArtists(row.id, row.primary_artist_id ?? null);
+    void loadStreamingLinks(row.id);
   }
 
   async function save() {
@@ -252,9 +320,10 @@ export function AdminSongsPage() {
     if (songId) {
       try {
         await syncSongArtists(songId, primaryArtistId || null, songArtists);
+        await syncStreamingLinks(songId);
       } catch (e) {
         setSubmitting(false);
-        setError(e instanceof Error ? e.message : "Failed to save song artists");
+        setError(e instanceof Error ? e.message : "Failed to save song relations");
         return;
       }
     }
@@ -626,6 +695,61 @@ export function AdminSongsPage() {
               className="h-11 w-full rounded-xl border bg-panel px-4 text-sm text-text outline-none"
               placeholder="https://youtube.com/watch?v=…"
             />
+          </div>
+
+          <div className="rounded-2xl border bg-panel2 p-4">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted">
+              Streaming links
+            </div>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">
+                  Spotify
+                </div>
+                <input
+                  value={spotifyUrl}
+                  onChange={(e) => setSpotifyUrl(e.target.value)}
+                  className="h-11 w-full rounded-xl border bg-panel px-4 text-sm text-text outline-none"
+                  placeholder="https://open.spotify.com/track/..."
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">
+                  Apple Music
+                </div>
+                <input
+                  value={appleMusicUrl}
+                  onChange={(e) => setAppleMusicUrl(e.target.value)}
+                  className="h-11 w-full rounded-xl border bg-panel px-4 text-sm text-text outline-none"
+                  placeholder="https://music.apple.com/..."
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">
+                  YouTube Music
+                </div>
+                <input
+                  value={youtubeMusicUrl}
+                  onChange={(e) => setYoutubeMusicUrl(e.target.value)}
+                  className="h-11 w-full rounded-xl border bg-panel px-4 text-sm text-text outline-none"
+                  placeholder="https://music.youtube.com/..."
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">
+                  JioSaavn
+                </div>
+                <input
+                  value={jioSaavnUrl}
+                  onChange={(e) => setJioSaavnUrl(e.target.value)}
+                  className="h-11 w-full rounded-xl border bg-panel px-4 text-sm text-text outline-none"
+                  placeholder="https://www.jiosaavn.com/..."
+                />
+              </div>
+            </div>
           </div>
 
           <label className="flex items-center gap-2 text-sm text-text">

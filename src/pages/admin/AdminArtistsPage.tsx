@@ -7,6 +7,7 @@ import {
   DataTable,
 } from "../../components/admin/AdminComponents";
 import { ErrorState } from "../../components/States";
+import { publicAssetUrl } from "../../lib/media";
 import { supabase } from "../../lib/supabaseClient";
 import type { ArtistRow } from "../../admin/supabaseAdmin";
 import { listArtists } from "../../admin/supabaseAdmin";
@@ -23,6 +24,20 @@ export function AdminArtistsPage() {
   const [bio, setBio] = useState("");
   const [published, setPublished] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePath, setImagePath] = useState<string | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(imageFile);
+    setImagePreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imageFile]);
 
   async function refresh() {
     setLoading(true);
@@ -42,6 +57,8 @@ export function AdminArtistsPage() {
     setName("");
     setBio("");
     setPublished(true);
+    setImageFile(null);
+    setImagePath(null);
     setModalOpen(true);
   }
 
@@ -50,36 +67,83 @@ export function AdminArtistsPage() {
     setName(row.name);
     setBio(row.bio ?? "");
     setPublished(row.is_published);
+    setImageFile(null);
+    setImagePath(row.image_path ?? null);
     setModalOpen(true);
+  }
+
+  function extFromFilename(filename: string) {
+    const m = filename.toLowerCase().match(/\.([a-z0-9]+)$/);
+    return m ? m[1] : null;
+  }
+
+  async function uploadArtistAvatar(artistId: string, file: File) {
+    const ext = extFromFilename(file.name) ?? "jpg";
+    const path = `artists/${artistId}.${ext}`;
+
+    const uploadRes = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+    if (uploadRes.error) throw uploadRes.error;
+    return uploadRes.data.path as string;
   }
 
   async function save() {
     setSubmitting(true);
     setError(null);
-    const payload = {
+
+    const basePayload = {
       name: name.trim(),
       bio: bio.trim() || null,
       is_published: published,
-    };
+    } as const;
 
-    if (!payload.name) {
+    if (!basePayload.name) {
       setSubmitting(false);
       setError("Name is required.");
       return;
     }
 
-    const res = editing
-      ? await supabase.from("artists").update(payload).eq("id", editing.id)
-      : await supabase.from("artists").insert(payload);
+    let artistId = editing?.id ?? null;
 
-    setSubmitting(false);
-    if (res.error) {
-      setError(res.error.message);
-      return;
+    if (editing) {
+      const updateRes = await supabase.from("artists").update(basePayload).eq("id", editing.id);
+      if (updateRes.error) {
+        setSubmitting(false);
+        setError(updateRes.error.message);
+        return;
+      }
+      artistId = editing.id;
+    } else {
+      const insertRes = await supabase.from("artists").insert(basePayload).select("id").single();
+      if (insertRes.error) {
+        setSubmitting(false);
+        setError(insertRes.error.message);
+        return;
+      }
+      artistId = (insertRes.data as { id: string } | null)?.id ?? null;
+    }
+
+    if (artistId) {
+      try {
+        let nextImagePath = imagePath;
+        if (imageFile) {
+          nextImagePath = await uploadArtistAvatar(artistId, imageFile);
+        }
+
+        const imageUpdateRes = await supabase
+          .from("artists")
+          .update({ image_path: nextImagePath })
+          .eq("id", artistId);
+        if (imageUpdateRes.error) throw imageUpdateRes.error;
+      } catch (e) {
+        setSubmitting(false);
+        setError(e instanceof Error ? e.message : "Failed to upload artist image");
+        return;
+      }
     }
 
     setModalOpen(false);
     await refresh();
+    setSubmitting(false);
   }
 
   async function remove(row: ArtistRow) {
@@ -182,6 +246,46 @@ export function AdminArtistsPage() {
               className="min-h-[120px] w-full rounded-xl border bg-panel px-4 py-3 text-sm text-text outline-none focus:ring-2 focus:ring-[color:var(--ring)]"
               placeholder="Optional artist bio…"
             />
+          </div>
+
+          <div className="rounded-2xl border bg-panel2 p-4">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted">
+              Artist image
+            </div>
+
+            <div className="mt-3 flex items-center gap-4">
+              <div className="h-20 w-20 overflow-hidden rounded-full border bg-panel">
+                {imagePreviewUrl ? (
+                  <img src={imagePreviewUrl} alt="" className="h-full w-full object-cover" />
+                ) : imagePath ? (
+                  <img
+                    src={publicAssetUrl("avatars", imagePath) ?? undefined}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : null}
+              </div>
+
+              <div className="min-w-0 flex-1 space-y-2">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+                  className="block w-full text-sm text-muted file:mr-3 file:rounded-full file:border file:bg-panel file:px-4 file:py-2 file:text-sm file:font-semibold file:text-text hover:file:bg-panel2"
+                />
+
+                <div className="flex gap-2">
+                  <AdminButton
+                    onClick={() => {
+                      setImageFile(null);
+                      setImagePath(null);
+                    }}
+                  >
+                    Remove image
+                  </AdminButton>
+                </div>
+              </div>
+            </div>
           </div>
 
           <label className="flex items-center gap-2 text-sm text-text">
