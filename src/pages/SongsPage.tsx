@@ -89,14 +89,14 @@ export function SongsPage() {
     return map;
   }, [albums]);
 
-  const albumCoverById = useMemo(() => {
+  const songCoverById = useMemo(() => {
     const map = new Map<string, string>();
-    for (const a of albums) {
-      const url = publicAssetUrl("covers", a.cover_path);
-      if (url) map.set(a.id, url);
+    for (const s of songs) {
+      const url = publicAssetUrl("covers", s.cover_path);
+      if (url) map.set(s.id, url);
     }
     return map;
-  }, [albums]);
+  }, [songs]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -157,9 +157,7 @@ export function SongsPage() {
               }
               variant="artwork"
               to={`/songs/${song.id}`}
-              imageUrl={
-                song.album_id ? albumCoverById.get(song.album_id) : undefined
-              }
+              imageUrl={songCoverById.get(song.id)}
             />
           ))}
         </div>
@@ -174,9 +172,7 @@ export function SongsPage() {
             const albumTitle = song.album_id
               ? albumTitleById.get(song.album_id) ?? ""
               : "";
-            const cover = song.album_id
-              ? albumCoverById.get(song.album_id)
-              : undefined;
+            const cover = songCoverById.get(song.id);
             return (
               <div key={song.id} className="flex items-center gap-3 px-4 py-3">
                 {cover ? (

@@ -114,7 +114,7 @@ export function ArtistDetailPage() {
         if (!s) return null;
         const role = c.role?.trim() || (s.primary_artist_id === artist?.id ? "Primary" : "");
         const subtitle = role ? `Song · ${role}` : "Song";
-        const coverUrl = s.album_id ? publicAssetUrl("covers", songAlbums[s.album_id]?.cover_path) ?? undefined : undefined;
+        const coverUrl = publicAssetUrl("covers", s.cover_path) ?? undefined;
         return <MediaCard key={`${s.id}:${c.sort_order ?? 0}`} title={s.title} subtitle={subtitle} to={`/songs/${s.id}`} imageUrl={coverUrl} />;
       })
       .filter(Boolean);

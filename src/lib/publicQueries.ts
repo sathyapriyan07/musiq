@@ -80,6 +80,7 @@ export type ArtistSongCredit = {
         | "album_id"
         | "track_number"
         | "duration_seconds"
+        | "cover_path"
         | "is_published"
         | "updated_at"
       >
@@ -91,6 +92,7 @@ export type ArtistSongCredit = {
         | "album_id"
         | "track_number"
         | "duration_seconds"
+        | "cover_path"
         | "is_published"
         | "updated_at"
       >[]
@@ -133,7 +135,7 @@ export async function getSongs(limit = 200) {
   return await supabase
     .from("songs")
     .select(
-      "id, title, primary_artist_id, album_id, track_number, duration_seconds, preview_url, youtube_url, is_published, updated_at",
+      "id, title, primary_artist_id, album_id, track_number, duration_seconds, preview_url, youtube_url, cover_path, is_published, updated_at",
     )
     .eq("is_published", true)
     .order("updated_at", { ascending: false })
@@ -144,7 +146,7 @@ export async function getSong(id: string) {
   return await supabase
     .from("songs")
     .select(
-      "id, title, primary_artist_id, album_id, track_number, duration_seconds, preview_url, youtube_url, is_published, updated_at",
+      "id, title, primary_artist_id, album_id, track_number, duration_seconds, preview_url, youtube_url, cover_path, is_published, updated_at",
     )
     .eq("id", id)
     .maybeSingle();
@@ -154,7 +156,7 @@ export async function getSongsByAlbum(albumId: string) {
   return await supabase
     .from("songs")
     .select(
-      "id, title, primary_artist_id, album_id, track_number, duration_seconds, preview_url, youtube_url, is_published, updated_at",
+      "id, title, primary_artist_id, album_id, track_number, duration_seconds, preview_url, youtube_url, cover_path, is_published, updated_at",
     )
     .eq("is_published", true)
     .eq("album_id", albumId)
@@ -176,7 +178,7 @@ export async function getSongsByArtist(artistId: string, limit = 50) {
   return await supabase
     .from("songs")
     .select(
-      "id, title, primary_artist_id, album_id, track_number, duration_seconds, preview_url, youtube_url, is_published, updated_at",
+      "id, title, primary_artist_id, album_id, track_number, duration_seconds, preview_url, youtube_url, cover_path, is_published, updated_at",
     )
     .eq("is_published", true)
     .eq("primary_artist_id", artistId)
@@ -188,7 +190,7 @@ export async function getSongCreditsByArtist(artistId: string, limit = 50) {
   return await supabase
     .from("song_artists")
     .select(
-      "role, sort_order, song:songs(id, title, primary_artist_id, album_id, track_number, duration_seconds, is_published, updated_at)",
+      "role, sort_order, song:songs(id, title, primary_artist_id, album_id, track_number, duration_seconds, cover_path, is_published, updated_at)",
     )
     .eq("artist_id", artistId)
     .eq("song.is_published", true)

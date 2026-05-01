@@ -9,6 +9,7 @@ import {
 import { ErrorState } from "../../components/States";
 import { searchItunesTracks, type ItunesTrack } from "../../admin/itunes";
 import { toItunesHiResArtwork, uploadImageFromUrl } from "../../admin/storageImport";
+import { publicAssetUrl } from "../../lib/media";
 import {
   ensureAlbum,
   ensureArtistByName,
@@ -44,6 +45,20 @@ export function AdminSongsPage() {
   const [youtubeUrl, setYoutubeUrl] = useState<string>("");
   const [published, setPublished] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+
+  function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setCoverFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => setCoverPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setCoverPreview(null);
+    }
+  }
 
   type SongArtistFormRow = {
     key: string;
@@ -351,6 +366,8 @@ export function AdminSongsPage() {
     setPublished(true);
     setSongArtists([]);
     setSongChannels([]);
+    setCoverFile(null);
+    setCoverPreview(null);
     setModalOpen(true);
   }
 
@@ -371,6 +388,8 @@ export function AdminSongsPage() {
     setPublished(row.is_published);
     setSongArtists([]);
     setSongChannels([]);
+    setCoverFile(null);
+    setCoverPreview(row.cover_path ? publicAssetUrl("covers", row.cover_path) : null);
     setModalOpen(true);
     void loadSongArtists(row.id, row.primary_artist_id ?? null);
     void loadSongChannels(row.id);
@@ -381,6 +400,26 @@ export function AdminSongsPage() {
     setSubmitting(true);
     setError(null);
 
+    let coverPath: string | null = editing?.cover_path ?? null;
+
+    if (coverFile) {
+      const fileExt = coverFile.name.split('.').pop() || 'jpg';
+      const pathWithoutExt = `songs/${editing?.id || Date.now()}`;
+      const path = `${pathWithoutExt}.${fileExt}`;
+      
+      const uploadRes = await supabase.storage.from("covers").upload(path, coverFile, {
+        contentType: coverFile.type,
+        upsert: true,
+      });
+      
+      if (uploadRes.error) {
+        setSubmitting(false);
+        setError(uploadRes.error.message);
+        return;
+      }
+      coverPath = path;
+    }
+
     const payload = {
       title: title.trim(),
       primary_artist_id: primaryArtistId || null,
@@ -389,6 +428,7 @@ export function AdminSongsPage() {
       duration_seconds: durationSeconds ? Number(durationSeconds) : null,
       preview_url: previewUrl.trim() || null,
       youtube_url: youtubeUrl.trim() || null,
+      cover_path: coverPath,
       is_published: published,
     };
 
@@ -471,9 +511,10 @@ export function AdminSongsPage() {
         if (albumRelRes.error) throw albumRelRes.error;
       }
 
+      let coverPath: string | null = null;
       if (albumId && track.artworkUrl100) {
         const artworkUrl = toItunesHiResArtwork(track.artworkUrl100);
-        const coverPath = await uploadImageFromUrl({
+        coverPath = await uploadImageFromUrl({
           bucketId: "covers",
           url: artworkUrl,
           pathWithoutExt: `albums/${albumId}`,
@@ -502,6 +543,7 @@ export function AdminSongsPage() {
         track_number: track.trackNumber ?? null,
         duration_seconds: durationSeconds,
         preview_url: track.previewUrl ?? null,
+        cover_path: coverPath,
         is_published: true,
       };
 
@@ -808,6 +850,23 @@ export function AdminSongsPage() {
                 ))}
               </select>
             </div>
+          </div>
+
+          <div>
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">
+              Cover Image
+            </div>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleCoverChange}
+              className="w-full rounded-xl border bg-panel px-4 py-3 text-sm text-text outline-none"
+            />
+            {coverPreview && (
+              <div className="mt-3">
+                <img src={coverPreview} alt="Cover preview" className="h-32 w-32 rounded-lg object-cover" />
+              </div>
+            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">

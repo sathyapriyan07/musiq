@@ -119,6 +119,7 @@ export function AlbumDetailPage() {
       const songArtist = s.primary_artist_id ? songArtists[s.primary_artist_id] : null;
       const creditedNames = formatCreditNames(songCredits[s.id] ?? []);
       const displayArtist = creditedNames ?? songArtist?.name ?? null;
+      const songCoverUrl = publicAssetUrl("covers", s.cover_path);
       return (
         <Link
           key={s.id}
@@ -127,7 +128,7 @@ export function AlbumDetailPage() {
         >
           <div className="w-6 shrink-0 text-right text-xs text-muted">{s.track_number ?? "—"}</div>
           <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-panel2">
-            {coverUrl ? <img src={coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" /> : null}
+            {songCoverUrl ? <img src={songCoverUrl} alt="" className="h-full w-full object-cover" loading="lazy" /> : null}
           </div>
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold text-text">{s.title}</div>
@@ -137,7 +138,7 @@ export function AlbumDetailPage() {
         </Link>
       );
     });
-  }, [songs, songArtists, songCredits, coverUrl]);
+  }, [songs, songArtists, songCredits]);
 
   return (
 
@@ -161,9 +162,9 @@ export function AlbumDetailPage() {
         <div className="grid gap-6 md:grid-cols-[280px_1fr]">
           <div className="flex flex-col items-center text-center">
             <div className="w-40 md:w-52">
-              <div className="aspect-[3/4] overflow-hidden rounded-2xl bg-panel2 shadow-soft">
+              <div className="aspect-square overflow-hidden rounded-2xl bg-panel2 shadow-soft">
                 {coverUrl ? (
-                  <img src={coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  <img src={coverUrl} alt="" className="h-full w-full object-contain" loading="lazy" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted">
                     <span className="text-xs uppercase tracking-wider">No Image</span>

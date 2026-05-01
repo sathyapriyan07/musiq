@@ -44,23 +44,17 @@ export function HomePage() {
   }, []);
 
   const songCards = useMemo(() => {
-    const coverByAlbumId = new Map<string, string>();
-    for (const a of albums) {
-      const url = publicAssetUrl("covers", a.cover_path);
-      if (url) coverByAlbumId.set(a.id, url);
-    }
-
     return songs.map((s) => (
       <MediaCard
         key={s.id}
         title={s.title}
         subtitle="Song"
         to={`/songs/${s.id}`}
-        imageUrl={s.album_id ? coverByAlbumId.get(s.album_id) : undefined}
+        imageUrl={publicAssetUrl("covers", s.cover_path) ?? undefined}
         className="w-[220px] shrink-0"
       />
     ));
-  }, [albums, songs]);
+  }, [songs]);
 
   const albumCards = useMemo(() => {
     return albums.map((a) => (

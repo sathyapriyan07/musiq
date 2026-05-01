@@ -214,7 +214,7 @@ export function SongDetailPage() {
 
   const durationLabel = formatDuration(song?.duration_seconds);
   const youtubeId = parseYouTubeId(song?.youtube_url);
-  const coverUrl = publicAssetUrl("covers", album?.cover_path);
+  const coverUrl = publicAssetUrl("covers", song?.cover_path);
 
   const displayCredits = useMemo(() => {
     if (credits.length) return credits;
