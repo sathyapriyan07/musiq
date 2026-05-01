@@ -14,28 +14,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 
-@font-face {
-  font-family: "SF Pro Display";
-  src: url("/SFPRODISPLAYSEMIBOLDITALIC.OTF") format("opentype");
-  font-weight: 600;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: "SF Pro Display";
-  src: url("/SFPRODISPLAYHEAVYITALIC.OTF") format("opentype");
-  font-weight: 800;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: "SF Pro Display";
-  src: url("/SFPRODISPLAYBLACKITALIC.OTF") format("opentype");
-  font-weight: 900;
-  font-style: italic;
-  font-display: swap;
-}
-
 /* Design tokens (Spotify-inspired) */
 :root {
   /* Apple Music-like light */
@@ -71,7 +49,7 @@ body {
   margin: 0;
   min-height: 100vh;
   font-family:
-    "SF Pro Display",
+    'Montserrat',
     ui-sans-serif,
     system-ui,
     -apple-system,
