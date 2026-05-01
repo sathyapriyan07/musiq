@@ -499,13 +499,23 @@ export function AdminSongsPage() {
     setImportError(null);
     setImportingTrackId(track.trackId);
     try {
-      const artistId = await ensureArtistByName(track.artistName);
-      const albumId = track.collectionName ? await ensureAlbum(track.collectionName, artistId) : null;
+      const artistNames = track.artistName.split(/[,&]/).map((name) => name.trim()).filter(Boolean);
+      const artistIds: string[] = [];
+      
+      for (const name of artistNames) {
+        const id = await ensureArtistByName(name);
+        if (id && !artistIds.includes(id)) {
+          artistIds.push(id);
+        }
+      }
+      
+      const primaryArtistId = artistIds[0] ?? null;
+      const albumId = track.collectionName ? await ensureAlbum(track.collectionName, primaryArtistId) : null;
       const durationSeconds = track.trackTimeMillis ? Math.round(track.trackTimeMillis / 1000) : null;
 
-      if (albumId) {
+      if (albumId && primaryArtistId) {
         const albumRelRes = await supabase.from("album_artists").upsert(
-          [{ album_id: albumId, artist_id: artistId, sort_order: 0 }],
+          [{ album_id: albumId, artist_id: primaryArtistId, sort_order: 0 }],
           { onConflict: "album_id,artist_id" },
         );
         if (albumRelRes.error) throw albumRelRes.error;
@@ -538,7 +548,7 @@ export function AdminSongsPage() {
 
       const payload = {
         title: track.trackName,
-        primary_artist_id: artistId,
+        primary_artist_id: primaryArtistId,
         album_id: albumId,
         track_number: track.trackNumber ?? null,
         duration_seconds: durationSeconds,
@@ -551,9 +561,16 @@ export function AdminSongsPage() {
       if (res.error) throw res.error;
 
       const songId = (res.data as { id: string } | null)?.id ?? null;
-      if (songId) {
+      if (songId && artistIds.length > 0) {
+        const artistRelations = artistIds.map((artistId, index) => ({
+          song_id: songId,
+          artist_id: artistId,
+          role: index === 0 ? "Primary" : null,
+          sort_order: index,
+        }));
+        
         const relRes = await supabase.from("song_artists").upsert(
-          [{ song_id: songId, artist_id: artistId, role: "Primary", sort_order: 0 }],
+          artistRelations,
           { onConflict: "song_id,artist_id" },
         );
         if (relRes.error) throw relRes.error;
