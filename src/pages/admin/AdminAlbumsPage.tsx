@@ -10,6 +10,7 @@ import { ErrorState } from "../../components/States";
 import { searchItunesAlbums, searchItunesTracks, type ItunesAlbum, type ItunesTrack } from "../../admin/itunes";
 import { toItunesHiResArtwork, uploadImageFromUrl } from "../../admin/storageImport";
 import { supabase } from "../../lib/supabaseClient";
+import { publicAssetUrl } from "../../lib/media";
 import type { AlbumRow, ArtistRow, ChannelRow } from "../../admin/supabaseAdmin";
 import { ensureArtistByName, listAlbums, listArtists, listChannels } from "../../admin/supabaseAdmin";
 
@@ -26,6 +27,8 @@ export function AdminAlbumsPage() {
   const [title, setTitle] = useState("");
   const [artistId, setArtistId] = useState<string>("");
   const [releaseDate, setReleaseDate] = useState<string>("");
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [published, setPublished] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -227,6 +230,8 @@ export function AdminAlbumsPage() {
     setTitle("");
     setArtistId("");
     setReleaseDate("");
+    setCoverPreview(null);
+    setCoverFile(null);
     setPublished(true);
     setAlbumArtists([]);
     setAlbumChannels([]);
@@ -238,12 +243,26 @@ export function AdminAlbumsPage() {
     setTitle(row.title);
     setArtistId(row.artist_id ?? "");
     setReleaseDate(row.release_date ?? "");
+    setCoverPreview(row.cover_path ? publicAssetUrl("covers", row.cover_path) : null);
+    setCoverFile(null);
     setPublished(row.is_published);
     setAlbumArtists([]);
     setAlbumChannels([]);
     setModalOpen(true);
     void loadAlbumArtists(row.id, row.artist_id ?? null);
     void loadAlbumChannels(row.id);
+  }
+
+  function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setCoverFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => setCoverPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setCoverPreview(null);
+    }
   }
 
   async function save() {
@@ -259,10 +278,30 @@ export function AdminAlbumsPage() {
       additionalForSave = normalizedAdditional.slice(1);
     }
 
+    let finalCoverPath: string | null = editing?.cover_path ?? null;
+    if (coverFile) {
+      const fileExt = coverFile.name.split('.').pop() || 'jpg';
+      const pathWithoutExt = `albums/${editing?.id || Date.now()}`;
+      const path = `${pathWithoutExt}.${fileExt}`;
+      
+      const uploadRes = await supabase.storage.from("covers").upload(path, coverFile, {
+        contentType: coverFile.type,
+        upsert: true,
+      });
+      
+      if (uploadRes.error) {
+        setSubmitting(false);
+        setError(uploadRes.error.message);
+        return;
+      }
+      finalCoverPath = path;
+    }
+
     const payload = {
       title: title.trim(),
       artist_id: primary,
       release_date: releaseDate || null,
+      cover_path: finalCoverPath,
       is_published: published,
     };
 
@@ -564,6 +603,23 @@ export function AdminAlbumsPage() {
               className="h-11 w-full rounded-xl border bg-panel px-4 text-sm text-text outline-none focus:ring-2 focus:ring-[color:var(--ring)]"
               placeholder="Album title"
             />
+          </div>
+
+          <div>
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">
+              Cover Image
+            </div>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleCoverChange}
+              className="w-full rounded-xl border bg-panel px-4 py-3 text-sm text-text outline-none"
+            />
+            {coverPreview && (
+              <div className="mt-3">
+                <img src={coverPreview} alt="Cover preview" className="h-32 w-32 rounded-lg object-cover" />
+              </div>
+            )}
           </div>
 
           <div>

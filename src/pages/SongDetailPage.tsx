@@ -9,6 +9,7 @@ import {
   getSong,
   getSongArtistCredits,
   getSongChannels,
+  getSongsByAlbum,
   getSongLinks,
   type Album,
   type Artist,
@@ -135,6 +136,8 @@ export function SongDetailPage() {
   const [song, setSong] = useState<Song | null>(null);
   const [artist, setArtist] = useState<Artist | null>(null);
   const [album, setAlbum] = useState<Album | null>(null);
+  const [albumSongs, setAlbumSongs] = useState<Song[]>([]);
+  const [visibleAlbumSongs, setVisibleAlbumSongs] = useState(4);
   const [links, setLinks] = useState<LinkRow[]>([]);
   const [credits, setCredits] = useState<SongArtistCredit[]>([]);
   const [channels, setChannels] = useState<SongChannelCredit[]>([]);
@@ -173,12 +176,13 @@ export function SongDetailPage() {
         return;
       }
 
-      const [linksRes, creditsRes, channelsRes, artistRes, albumRes] = await Promise.all([
+      const [linksRes, creditsRes, channelsRes, artistRes, albumRes, albumSongsRes] = await Promise.all([
         getSongLinks(row.id),
         getSongArtistCredits(row.id),
         getSongChannels(row.id),
         row.primary_artist_id ? getArtist(row.primary_artist_id) : Promise.resolve({ data: null, error: null }),
         row.album_id ? getAlbum(row.album_id) : Promise.resolve({ data: null, error: null }),
+        row.album_id ? getSongsByAlbum(row.album_id) : Promise.resolve({ data: null, error: null }),
       ]);
       if (cancelled) return;
       if (creditsRes.error) setError(creditsRes.error.message);
@@ -186,11 +190,13 @@ export function SongDetailPage() {
       if (artistRes?.error) setError(artistRes.error.message);
       if (albumRes?.error) setError(albumRes.error.message);
       if (linksRes.error) setError(linksRes.error.message);
+      if (albumSongsRes.error) setError(albumSongsRes.error.message);
       setArtist((artistRes.data ?? null) as Artist | null);
       setAlbum((albumRes.data ?? null) as Album | null);
       setLinks((linksRes.data ?? []) as LinkRow[]);
       setCredits((creditsRes.data ?? []) as SongArtistCredit[]);
       setChannels((channelsRes.data ?? []) as SongChannelCredit[]);
+      setAlbumSongs((albumSongsRes?.data ?? []) as Song[]);
 
       setLoading(false);
     }
@@ -392,6 +398,40 @@ export function SongDetailPage() {
             ) : null}
 
             {links.length ? <LinkButtons links={groupedLinks} /> : null}
+
+            {album && albumSongs.filter(s => s.id !== song?.id).length > 0 ? (
+              <section className="space-y-3">
+                <div className="text-sm font-semibold text-text">More from {album.title}</div>
+                <div className="grid grid-cols-4 gap-3">
+                  {albumSongs
+                    .filter(s => s.id !== song?.id)
+                    .slice(0, visibleAlbumSongs)
+                    .map((s) => {
+                      const songCoverUrl = publicAssetUrl("covers", s.cover_path);
+                      return (
+                        <Link key={s.id} to={`/songs/${s.id}`} className="group block">
+                          <div className="aspect-square overflow-hidden rounded-xl bg-panel2">
+                            {songCoverUrl ? (
+                              <img src={songCoverUrl} alt="" className="h-full w-full object-cover transition duration-300 group-hover:scale-110" loading="lazy" />
+                            ) : null}
+                          </div>
+                          <div className="mt-2">
+                            <div className="truncate text-sm font-semibold text-text">{s.title}</div>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                </div>
+                {visibleAlbumSongs < albumSongs.filter(s => s.id !== song?.id).length && (
+                  <button
+                    onClick={() => setVisibleAlbumSongs(prev => prev + 4)}
+                    className="mt-3 text-sm font-medium text-accent hover:underline"
+                  >
+                    View More
+                  </button>
+                )}
+              </section>
+            ) : null}
           </div>
         </div>
       )}

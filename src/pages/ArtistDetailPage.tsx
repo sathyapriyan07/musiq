@@ -7,6 +7,7 @@ import {
   getAlbum,
   getAlbumsByArtist,
   getArtist,
+  getRelatedArtists,
   getSongCreditsByArtist,
   type Album,
   type Artist,
@@ -19,6 +20,9 @@ export function ArtistDetailPage() {
   const [artist, setArtist] = useState<Artist | null>(null);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [songCredits, setSongCredits] = useState<ArtistSongCredit[]>([]);
+  const [showAllSongs, setShowAllSongs] = useState(false);
+  const [relatedArtists, setRelatedArtists] = useState<{ id: string; name: string; image_path: string | null }[]>([]);
+  const [visibleRelatedArtists, setVisibleRelatedArtists] = useState(4);
   const [songAlbums, setSongAlbums] = useState<Record<string, Album>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,17 +60,20 @@ export function ArtistDetailPage() {
         return;
       }
 
-      const [albumsRes, songsRes] = await Promise.all([
+      const [albumsRes, songsRes, relatedRes] = await Promise.all([
         getAlbumsByArtist(row.id),
-        getSongCreditsByArtist(row.id, 24),
+        getSongCreditsByArtist(row.id),
+        getRelatedArtists(row.id),
       ]);
       if (cancelled) return;
       if (albumsRes.error) setError(albumsRes.error.message);
       if (songsRes.error) setError(songsRes.error.message);
+      if (relatedRes.error) setError(relatedRes.error.message);
       const fetchedAlbums = (albumsRes.data ?? []) as Album[];
       setAlbums(fetchedAlbums);
       const credits = (songsRes.data ?? []) as ArtistSongCredit[];
       setSongCredits(credits);
+      setRelatedArtists((relatedRes.data ?? []) as { id: string; name: string; image_path: string | null }[]);
 
       const albumMap: Record<string, Album> = {};
       fetchedAlbums.forEach((a) => { albumMap[a.id] = a; });
@@ -90,17 +97,25 @@ export function ArtistDetailPage() {
   }, [artistId]);
 
   const albumCards = useMemo(() => {
-    return albums.map((a) => (
-      <MediaCard
-        key={a.id}
-        title={a.title}
-        subtitle="Album"
-        aspect="poster"
-        to={`/albums/${a.id}`}
-        imageUrl={publicAssetUrl("covers", a.cover_path) ?? undefined}
-      />
-    ));
+    return albums.map((a: Album) => {
+      const coverUrl = a.cover_path ? publicAssetUrl("covers", a.cover_path) ?? undefined : undefined;
+      return (
+        <MediaCard
+          key={a.id}
+          title={a.title}
+          subtitle="Album"
+          aspect="square"
+          variant="artwork"
+          to={`/albums/${a.id}`}
+          imageUrl={coverUrl}
+        />
+      );
+    });
   }, [albums]);
+
+  const displayedSongCredits = useMemo(() => {
+    return showAllSongs ? songCredits : songCredits.slice(0, 16);
+  }, [songCredits, showAllSongs]);
 
   const songCards = useMemo(() => {
     function creditSong(credit: ArtistSongCredit) {
@@ -108,19 +123,28 @@ export function ArtistDetailPage() {
       return Array.isArray(credit.song) ? credit.song[0] ?? null : credit.song;
     }
 
-    return songCredits
+    return displayedSongCredits
       .map((c) => {
         const s = creditSong(c);
         if (!s) return null;
         const role = c.role?.trim() || (s.primary_artist_id === artist?.id ? "Primary" : "");
         const subtitle = role ? `Song · ${role}` : "Song";
-        const coverUrl = publicAssetUrl("covers", s.cover_path) ?? undefined;
-        return <MediaCard key={`${s.id}:${c.sort_order ?? 0}`} title={s.title} subtitle={subtitle} to={`/songs/${s.id}`} imageUrl={coverUrl} />;
+        const coverUrl = s.cover_path ? publicAssetUrl("covers", s.cover_path) ?? undefined : undefined;
+        return (
+          <MediaCard
+            key={`${s.id}:${c.sort_order ?? 0}`}
+            title={s.title}
+            subtitle={subtitle}
+            variant="artwork"
+            to={`/songs/${s.id}`}
+            imageUrl={coverUrl}
+          />
+        );
       })
       .filter(Boolean);
-  }, [artist?.id, songCredits, songAlbums]);
+  }, [artist?.id, displayedSongCredits, songAlbums]);
 
-  const avatarUrl = publicAssetUrl("avatars", artist?.image_path);
+  const avatarUrl = publicAssetUrl("avatars", artist?.image_path) ?? undefined;
 
   return (
     <div className="space-y-6">
@@ -170,20 +194,58 @@ export function ArtistDetailPage() {
             {albums.length ? (
               <section className="space-y-3">
                 <div className="text-sm font-semibold text-text">Albums</div>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{albumCards}</div>
+                <div className="grid grid-cols-4 gap-3">{albumCards}</div>
               </section>
             ) : null}
 
             {songCredits.length ? (
               <section className="space-y-3">
                 <div className="text-sm font-semibold text-text">Songs</div>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{songCards}</div>
+                <div className="grid grid-cols-4 gap-3">{songCards}</div>
+                {!showAllSongs && songCredits.length > 16 && (
+                  <button
+                    onClick={() => setShowAllSongs(true)}
+                    className="text-sm font-medium text-accent hover:underline"
+                  >
+                    View More
+                  </button>
+                )}
               </section>
             ) : !albums.length ? (
               <EmptyState
                 title="No content for this artist yet"
                 description="Import songs for this artist, or add albums/songs in Admin."
               />
+            ) : null}
+
+            {relatedArtists.length ? (
+              <section className="space-y-3">
+                <div className="text-sm font-semibold text-text">Related Artists</div>
+                <div className="grid grid-cols-4 gap-3">
+                  {relatedArtists.slice(0, visibleRelatedArtists).map((a) => {
+                    const imageUrl = a.image_path ? publicAssetUrl("avatars", a.image_path) ?? undefined : undefined;
+                    return (
+                      <MediaCard
+                        key={a.id}
+                        title={a.name}
+                        subtitle="Artist"
+                        shape="round"
+                        variant="artwork"
+                        to={`/artists/${a.id}`}
+                        imageUrl={imageUrl}
+                      />
+                    );
+                  })}
+                </div>
+                {visibleRelatedArtists < relatedArtists.length && (
+                  <button
+                    onClick={() => setVisibleRelatedArtists(prev => prev + 4)}
+                    className="text-sm font-medium text-accent hover:underline"
+                  >
+                    View More
+                  </button>
+                )}
+              </section>
             ) : null}
           </div>
         </div>

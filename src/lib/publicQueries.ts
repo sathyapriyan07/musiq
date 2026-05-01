@@ -189,16 +189,49 @@ export async function getSongsByArtist(artistId: string, limit = 50) {
     .limit(limit);
 }
 
-export async function getSongCreditsByArtist(artistId: string, limit = 50) {
-  return await supabase
+export async function getSongCreditsByArtist(artistId: string, limit?: number | null) {
+  let query = supabase
     .from("song_artists")
     .select(
       "role, sort_order, song:songs(id, title, primary_artist_id, album_id, track_number, duration_seconds, cover_path, is_published, updated_at)",
     )
     .eq("artist_id", artistId)
     .eq("song.is_published", true)
-    .order("updated_at", { ascending: false, foreignTable: "song" })
-    .limit(limit);
+    .order("updated_at", { ascending: false, foreignTable: "song" });
+
+  if (limit != null && limit > 0) {
+    query = query.limit(limit);
+  }
+
+  return await query;
+}
+
+export async function getRelatedArtists(artistId: string) {
+  const { data, error } = await supabase
+    .from("song_artists")
+    .select(`
+      song:songs(
+        id,
+        song_artists:song_artists(artist:artists(id, name, image_path, is_published))
+      )
+    `)
+    .eq("artist_id", artistId);
+
+  if (error) return { data: null, error };
+
+  const artistMap: Record<string, { id: string; name: string; image_path: string | null }> = {};
+  (data ?? []).forEach((row: any) => {
+    const song = Array.isArray(row.song) ? row.song[0] : row.song;
+    if (!song) return;
+    const credits = Array.isArray(song.song_artists) ? song.song_artists : [];
+    credits.forEach((c: any) => {
+      const a = Array.isArray(c.artist) ? c.artist[0] : c.artist;
+      if (!a || a.id === artistId || !a.is_published) return;
+      artistMap[a.id] = { id: a.id, name: a.name, image_path: a.image_path };
+    });
+  });
+
+  return { data: Object.values(artistMap), error: null };
 }
 
 export async function getSongLinks(songId: string) {

@@ -73,7 +73,7 @@ export async function listSongs() {
   return await supabase
     .from("songs")
     .select(
-      "id, title, primary_artist_id, album_id, track_number, duration_seconds, preview_url, youtube_url, is_published, updated_at",
+      "id, title, primary_artist_id, album_id, track_number, duration_seconds, preview_url, youtube_url, cover_path, is_published, updated_at, deezer_id, explicit, deezer_url",
     )
     .order("updated_at", { ascending: false });
 }

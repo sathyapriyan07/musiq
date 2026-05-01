@@ -1,9 +1,11 @@
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { EmptyState, ErrorState } from "../components/States";
+import { MediaCard } from "../components/MediaCard";
 import { publicAssetUrl } from "../lib/media";
 import {
   getAlbum,
+  getAlbumsByArtist,
   getArtist,
   getAlbumChannels,
   getSongArtistCreditsForSongs,
@@ -26,6 +28,8 @@ export function AlbumDetailPage() {
   const { albumId } = useParams();
   const [album, setAlbum] = useState<Album | null>(null);
   const [artist, setArtist] = useState<Artist | null>(null);
+  const [artistAlbums, setArtistAlbums] = useState<Album[]>([]);
+  const [visibleArtistAlbums, setVisibleArtistAlbums] = useState(4);
   const [channels, setChannels] = useState<AlbumChannelCredit[]>([]);
   const [songs, setSongs] = useState<Song[]>([]);
   const [songArtists, setSongArtists] = useState<Record<string, Artist>>({});
@@ -66,20 +70,25 @@ export function AlbumDetailPage() {
         return;
       }
 
-      const [artistRes, songsRes, channelsRes] = await Promise.all([
+      const [artistRes, songsRes, channelsRes, artistAlbumsRes] = await Promise.all([
         row.artist_id ? getArtist(row.artist_id) : Promise.resolve({ data: null, error: null }),
         getSongsByAlbum(row.id),
         getAlbumChannels(row.id),
+        row.artist_id ? getAlbumsByArtist(row.artist_id) : Promise.resolve({ data: null, error: null }),
       ]);
       if (cancelled) return;
       if (artistRes.error) setError(artistRes.error.message);
       if (songsRes.error) setError(songsRes.error.message);
       if (channelsRes.error) setError(channelsRes.error.message);
+      if (artistAlbumsRes.error) setError(artistAlbumsRes.error.message);
       const fetchedArtist = (artistRes.data ?? null) as Artist | null;
       const fetchedSongs = (songsRes.data ?? []) as Song[];
       setChannels((channelsRes.data ?? []) as AlbumChannelCredit[]);
       setArtist(fetchedArtist);
       setSongs(fetchedSongs);
+      setArtistAlbums(
+        ((artistAlbumsRes.data ?? []) as Album[]).filter((a) => a.id !== row.id),
+      );
 
       const creditsRes = await getSongArtistCreditsForSongs(fetchedSongs.map((s) => s.id));
       if (cancelled) return;
@@ -174,6 +183,17 @@ export function AlbumDetailPage() {
 
             <div className="mt-4 space-y-1">
               <div className="text-lg font-bold text-text">{album.title}</div>
+              {artist ? (
+                <Link to={`/artists/${artist.id}`} className="mx-auto mt-2 block w-12 overflow-hidden rounded-full bg-panel2">
+                  {artist.image_path ? (
+                    <img src={publicAssetUrl("avatars", artist.image_path) ?? undefined} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  ) : (
+                    <div className="flex aspect-square items-center justify-center text-muted">
+                      <span className="text-xs uppercase tracking-wider">No Image</span>
+                    </div>
+                  )}
+                </Link>
+              ) : null}
               <div className="text-sm text-muted">{artist?.name ?? "—"}</div>
               {channels.length ? (
                 <div className="pt-2">
@@ -203,14 +223,44 @@ export function AlbumDetailPage() {
             </div>
           </div>
 
-          <div className="flex flex-col items-center">
+           <div className="flex flex-col items-center">
             {!songs.length ? (
               <EmptyState title="No tracks yet" description="Import songs for this album, or add them in Admin." />
             ) : (
               <div className="w-full max-w-4xl">
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-5">{trackRows}</div>
+                <div className="grid grid-cols-4 gap-3">{trackRows}</div>
               </div>
             )}
+
+            {artistAlbums.length ? (
+              <section className="mt-6 space-y-3 w-full max-w-4xl">
+                <div className="text-sm font-semibold text-text">More from {artist?.name ?? "Artist"}</div>
+                <div className="grid grid-cols-4 gap-3">
+                  {artistAlbums.slice(0, visibleArtistAlbums).map((a) => {
+                    const coverUrl = a.cover_path ? publicAssetUrl("covers", a.cover_path) ?? undefined : undefined;
+                    return (
+                      <MediaCard
+                        key={a.id}
+                        title={a.title}
+                        subtitle="Album"
+                        aspect="square"
+                        variant="artwork"
+                        to={`/albums/${a.id}`}
+                        imageUrl={coverUrl}
+                      />
+                    );
+                  })}
+                </div>
+                {visibleArtistAlbums < artistAlbums.length && (
+                  <button
+                    onClick={() => setVisibleArtistAlbums(prev => prev + 4)}
+                    className="mt-3 text-sm font-medium text-accent hover:underline"
+                  >
+                    View More
+                  </button>
+                )}
+              </section>
+            ) : null}
           </div>
         </div>
       )}

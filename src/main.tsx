@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
+import "@fontsource-variable/momo-trust-sans/wght.css";
 import "./style.css";
 import { initTheme } from "./theme";
 import { App } from "./App";
