@@ -153,7 +153,7 @@ export function AlbumDetailPage() {
       </div>
 
       {loading ? (
-        <div className="rounded-xl border bg-panel p-6 text-sm text-muted">Loading…</div>
+        <div className="p-6 text-sm text-muted">Loading…</div>
       ) : error ? (
         <ErrorState title="Failed to load album" description={error} />
       ) : !album ? (
@@ -162,7 +162,7 @@ export function AlbumDetailPage() {
         <div className="grid gap-6 md:grid-cols-[280px_1fr]">
           <div className="flex flex-col items-center text-center">
             <div className="w-40 md:w-52">
-              <div className="aspect-square overflow-hidden rounded-2xl bg-panel2 shadow-soft">
+              <div className="aspect-square overflow-hidden rounded-2xl bg-panel2">
                 {coverUrl ? (
                   <img src={coverUrl} alt="" className="h-full w-full object-contain" loading="lazy" />
                 ) : (
@@ -186,7 +186,7 @@ export function AlbumDetailPage() {
                       return (
                         <div
                           key={`${c.channel_id}:${c.sort_order ?? 0}`}
-                          className="flex items-center gap-2 rounded-full border bg-panel2 px-3 py-2"
+                          className="flex items-center gap-2 rounded-full bg-panel2 px-3 py-2"
                         >
                           <div className="h-6 w-6 overflow-hidden rounded-full bg-panel">
                             {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : null}
@@ -209,7 +209,7 @@ export function AlbumDetailPage() {
               <EmptyState title="No tracks yet" description="Import songs for this album, or add them in Admin." />
             ) : (
               <div className="w-full max-w-2xl">
-                <div className="no-scrollbar flex max-h-96 flex-col gap-1 overflow-y-auto">{trackRows}</div>
+                <div className="flex flex-col gap-1">{trackRows}</div>
               </div>
             )}
           </div>

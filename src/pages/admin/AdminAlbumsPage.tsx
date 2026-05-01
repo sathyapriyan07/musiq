@@ -7,9 +7,11 @@ import {
   DataTable,
 } from "../../components/admin/AdminComponents";
 import { ErrorState } from "../../components/States";
+import { searchItunesAlbums, searchItunesTracks, type ItunesAlbum, type ItunesTrack } from "../../admin/itunes";
+import { toItunesHiResArtwork, uploadImageFromUrl } from "../../admin/storageImport";
 import { supabase } from "../../lib/supabaseClient";
 import type { AlbumRow, ArtistRow, ChannelRow } from "../../admin/supabaseAdmin";
-import { listAlbums, listArtists, listChannels } from "../../admin/supabaseAdmin";
+import { ensureArtistByName, listAlbums, listArtists, listChannels } from "../../admin/supabaseAdmin";
 
 export function AdminAlbumsPage() {
   const [rows, setRows] = useState<AlbumRow[]>([]);
@@ -42,6 +44,13 @@ export function AdminAlbumsPage() {
 
   const [albumChannels, setAlbumChannels] = useState<AlbumChannelFormRow[]>([]);
   const [albumChannelsLoading, setAlbumChannelsLoading] = useState(false);
+
+  const [importOpen, setImportOpen] = useState(false);
+  const [importTerm, setImportTerm] = useState("");
+  const [importResults, setImportResults] = useState<ItunesAlbum[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importingAlbumId, setImportingAlbumId] = useState<number | null>(null);
 
   async function refresh() {
     setLoading(true);
@@ -300,6 +309,158 @@ export function AdminAlbumsPage() {
     await refresh();
   }
 
+  async function runImportSearch() {
+    setImportLoading(true);
+    setImportError(null);
+    try {
+      const results = await searchItunesAlbums(importTerm, 25);
+      setImportResults(results);
+    } catch (e) {
+      setImportResults([]);
+      setImportError(e instanceof Error ? e.message : "Import search failed");
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
+  async function importAlbum(album: ItunesAlbum) {
+    setImportError(null);
+    setImportingAlbumId(album.collectionId);
+    try {
+      const artistId = await ensureArtistByName(album.artistName);
+
+      let coverPath: string | null = null;
+      if (album.artworkUrl100) {
+        const artworkUrl = toItunesHiResArtwork(album.artworkUrl100);
+        coverPath = await uploadImageFromUrl({
+          bucketId: "covers",
+          url: artworkUrl,
+          pathWithoutExt: `albums/${album.collectionId}`,
+        });
+      }
+
+      const releaseDate = album.releaseDate
+        ? (() => {
+              const d = new Date(album.releaseDate);
+              if (Number.isNaN(d.getTime())) return null;
+              return d.toISOString().slice(0, 10);
+            })()
+        : null;
+
+      const payload = {
+        title: album.collectionName,
+        artist_id: artistId,
+        cover_path: coverPath,
+        release_date: releaseDate,
+        is_published: true,
+      };
+
+      const res = await supabase.from("albums").insert(payload).select("id").single();
+      if (res.error) throw res.error;
+
+      const albumId = (res.data as { id: string } | null)?.id ?? null;
+      if (albumId && artistId) {
+        const relRes = await supabase.from("album_artists").insert({
+          album_id: albumId,
+          artist_id: artistId,
+          sort_order: 0,
+        });
+        if (relRes.error) throw relRes.error;
+      }
+
+      if (albumId && album.collectionViewUrl) {
+        const linkRes = await supabase.from("album_links").insert({
+          album_id: albumId,
+          category: "official",
+          platform: "Apple Music",
+          url: album.collectionViewUrl,
+        });
+        if (linkRes.error) throw linkRes.error;
+      }
+
+      if (albumId) {
+        await importAlbumSongs(album, albumId, artistId);
+      }
+
+      await refresh();
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : "Import failed");
+    } finally {
+      setImportingAlbumId(null);
+    }
+  }
+
+  async function importAlbumSongs(album: ItunesAlbum, albumId: string, primaryArtistId: string | null) {
+    try {
+      const searchRes = await searchItunesTracks(album.collectionName || "", 50);
+        const albumSongs = searchRes.filter(
+          (track: ItunesTrack) => track && track.collectionName === album.collectionName
+        );
+
+        for (const track of albumSongs) {
+        const artistNames = (track as ItunesTrack).artistName.split(/[,&]/).map((name: string) => name.trim()).filter(Boolean);
+        const artistIds: string[] = [];
+        
+        for (const name of artistNames) {
+          const id = await ensureArtistByName(name);
+          if (id && !artistIds.includes(id)) {
+            artistIds.push(id);
+          }
+        }
+
+        const currentPrimaryArtistId = artistIds[0] ?? primaryArtistId;
+          const durationSeconds = track?.trackTimeMillis ? Math.round(track.trackTimeMillis / 1000) : null;
+
+          let songCoverPath: string | null = null;
+          if (track?.artworkUrl100) {
+            const artworkUrl = toItunesHiResArtwork(track.artworkUrl100);
+          songCoverPath = await uploadImageFromUrl({
+            bucketId: "covers",
+            url: artworkUrl,
+            pathWithoutExt: `songs/${track.trackId}`,
+          });
+        }
+
+        const songPayload = {
+          title: track.trackName,
+          primary_artist_id: currentPrimaryArtistId,
+          album_id: albumId,
+          track_number: track.trackNumber ?? null,
+          duration_seconds: durationSeconds,
+          preview_url: track.previewUrl ?? null,
+          cover_path: songCoverPath,
+          is_published: true,
+        };
+
+        const songRes = await supabase.from("songs").insert(songPayload).select("id").single();
+        if (songRes.error) continue;
+
+        const songId = (songRes.data as { id: string } | null)?.id ?? null;
+        if (songId && artistIds.length > 0) {
+          const artistRelations = artistIds.map((artistId, index) => ({
+            song_id: songId,
+            artist_id: artistId,
+            role: index === 0 ? "Primary" : null,
+            sort_order: index,
+          }));
+          
+          await supabase.from("song_artists").upsert(artistRelations, { onConflict: "song_id,artist_id" });
+        }
+
+          if (songId && track?.trackViewUrl) {
+            await supabase.from("song_links").insert({
+              song_id: songId,
+              category: "official",
+              platform: "Apple Music",
+              url: track.trackViewUrl,
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to import album songs:", e);
+    }
+  }
+
   const artistNameById = useMemo(() => {
     const map = new Map<string, string>();
     for (const a of artists) map.set(a.id, a.name);
@@ -348,11 +509,17 @@ export function AdminAlbumsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-end justify-between gap-3">
-        <div className="text-xl font-bold text-text">Admin · Albums</div>
-        <AdminButton variant="primary" onClick={openCreate}>
-          Add Album
-        </AdminButton>
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <div className="text-xl font-bold text-text">Admin · Albums</div>
+          <div className="text-xs text-muted">Create, import, and manage albums.</div>
+        </div>
+        <div className="flex gap-2">
+          <AdminButton onClick={() => setImportOpen(true)}>Import iTunes</AdminButton>
+          <AdminButton variant="primary" onClick={openCreate}>
+            Add Album
+          </AdminButton>
+        </div>
       </div>
 
       <AdminCard title="Albums">
@@ -537,6 +704,76 @@ export function AdminAlbumsPage() {
             />
             Published
           </label>
+        </div>
+      </AdminModal>
+
+      <AdminModal
+        open={importOpen}
+        title="Import from iTunes"
+        onClose={() => setImportOpen(false)}
+        footer={
+          <div className="flex justify-end gap-2">
+            <AdminButton onClick={() => setImportOpen(false)}>Close</AdminButton>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <input
+              value={importTerm}
+              onChange={(e) => setImportTerm(e.target.value)}
+              className="h-11 w-full rounded-xl border bg-panel px-4 text-sm text-text outline-none focus:ring-2 focus:ring-[color:var(--ring)]"
+              placeholder="Search artist or album… (e.g. The Weeknd)"
+            />
+            <AdminButton variant="primary" onClick={() => void runImportSearch()} disabled={importLoading}>
+              {importLoading ? "Searching…" : "Search"}
+            </AdminButton>
+          </div>
+
+          {importError ? <ErrorState title="Import error" description={importError} /> : null}
+
+          {!importLoading && !importResults.length ? (
+            <div className="rounded-xl border bg-panel2 p-4 text-sm text-muted">
+              Search for an album, then click Import.
+            </div>
+          ) : null}
+
+          {importResults.length ? (
+            <div className="divide-y rounded-xl border bg-panel">
+              {importResults.map((album) => (
+                <div key={album.collectionId} className="flex items-center gap-3 px-4 py-3">
+                  {album.artworkUrl100 ? (
+                    <img
+                      src={album.artworkUrl100}
+                      alt=""
+                      className="h-12 w-12 rounded-lg border object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="h-12 w-12 rounded-lg border bg-panel2" />
+                  )}
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-text">
+                      {album.collectionName}
+                    </div>
+                    <div className="truncate text-xs text-muted">
+                      {album.artistName}
+                      {album.releaseDate ? ` · ${new Date(album.releaseDate).getFullYear()}` : ""}
+                    </div>
+                  </div>
+                  <div className="ml-auto">
+                    <AdminButton
+                      variant="primary"
+                      onClick={() => void importAlbum(album)}
+                      disabled={importingAlbumId === album.collectionId}
+                    >
+                      {importingAlbumId === album.collectionId ? "Importing…" : "Import"}
+                    </AdminButton>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       </AdminModal>
     </div>
