@@ -575,6 +575,17 @@ export function AdminSongsPage() {
         );
         if (relRes.error) throw relRes.error;
       }
+
+      if (songId && track.trackViewUrl) {
+        const linkRes = await supabase.from("song_links").insert({
+          song_id: songId,
+          category: "official",
+          platform: "Apple Music",
+          url: track.trackViewUrl,
+        });
+        if (linkRes.error) throw linkRes.error;
+      }
+
       await refresh();
     } catch (e) {
       setImportError(e instanceof Error ? e.message : "Import failed");
