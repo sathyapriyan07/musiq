@@ -36,6 +36,7 @@ export type Song = {
   duration_seconds: number | null;
   preview_url: string | null;
   youtube_url: string | null;
+  cover_path: string | null;
   is_published: boolean;
   updated_at: string;
 };

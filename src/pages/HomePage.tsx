@@ -68,7 +68,6 @@ export function HomePage() {
         key={a.id}
         title={a.title}
         subtitle="Album"
-        aspect="poster"
         to={`/albums/${a.id}`}
         imageUrl={publicAssetUrl("covers", a.cover_path) ?? undefined}
         className="w-[190px] shrink-0"

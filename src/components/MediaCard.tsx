@@ -46,7 +46,7 @@ export function MediaCard({
       className={clsx(
         variant === "artwork"
           ? "group transition"
-          : "group rounded-2xl border bg-panel p-3 transition hover:bg-panel2 surface shadow-soft",
+          : "group rounded-2xl bg-panel p-3 transition hover:bg-panel2 surface shadow-soft",
         className,
       )}
     >
@@ -62,7 +62,7 @@ export function MediaCard({
             src={imageUrl}
             alt=""
             loading="lazy"
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+            className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.02]"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted">
