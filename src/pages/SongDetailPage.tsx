@@ -368,6 +368,29 @@ export function SongDetailPage() {
               </div>
             ) : null}
 
+            {song.deezer_url ? (
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-text">Deezer</div>
+                <a
+                  href={song.deezer_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#1e1e1e] px-4 py-3 text-sm font-semibold text-[#00c853] transition hover:bg-[#2a2a2a]"
+                >
+                  <span>Listen on Deezer</span>
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm3.78 14.58c-1.08.64-2.88 1.08-4.38 1.08-1.62 0-2.88-.44-3.78-1.16-.3-.22-.36-.64-.18-.94.18-.3.64-.36.94-.18 1.56.98 3.72 1.3 5.28 1.3 1.26 0 2.7-.28 4.08-.84.34-.14.72.02.86.36.14.34-.02.72-.36.86-.44.22-.9.34-1.36.34-.5 0-1.02-.08-1.5-.22zm1.2-3.1c-1.28.76-3.42 1.28-5.28 1.28-1.86 0-3.3-.46-4.32-1.22-.26-.2-.32-.58-.14-.84.2-.26.58-.32.84-.14 1.62.98 3.54 1.36 5.06 1.36 1.42 0 3.06-.36 4.18-1.04.3-.18.68-.08.86.22.18.3.08.68-.22.86-.24.14-.48.22-.72.3-.22.08-.46.12-.7.12-.26 0-.52-.06-.76-.18zm1.28-3.16c-1.46.88-3.9 1.46-6.2 1.46-2.3 0-4.08-.58-5.34-1.46-.24-.18-.3-.52-.12-.76.18-.24.52-.3.76-.12 1.84.98 3.96 1.42 5.46 1.42 1.5 0 3.64-.44 5.08-1.28.26-.18.6-.1.78.16.18.26.1.6-.16.78-.34.2-.68.32-1.02.38-.34.06-.68.1-1.02.1-.36 0-.7-.06-1.04-.18-.36-.12-.7-.3-1.04-.5z"/>
+                  </svg>
+                </a>
+              </div>
+            ) : null}
+
+            {song.explicit ? (
+              <div className="inline-flex items-center rounded bg-red-600 px-2 py-1 text-xs font-bold text-white">
+                EXPLICIT
+              </div>
+            ) : null}
+
             {links.length ? <LinkButtons links={groupedLinks} /> : null}
           </div>
         </div>

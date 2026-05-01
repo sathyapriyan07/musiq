@@ -39,6 +39,9 @@ export type Song = {
   cover_path: string | null;
   is_published: boolean;
   updated_at: string;
+  deezer_id: number | null;
+  explicit: boolean;
+  deezer_url: string | null;
 };
 
 export type SongArtistCredit = {

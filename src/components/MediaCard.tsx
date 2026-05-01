@@ -16,6 +16,8 @@ type Props = {
   variant?: Variant;
   rightSlot?: ReactNode;
   className?: string;
+  deezerId?: number;
+  previewUrl?: string;
 };
 
 function aspectClass(aspect: Aspect) {
@@ -40,6 +42,8 @@ export function MediaCard({
   variant = "default",
   rightSlot,
   className,
+  deezerId,
+  previewUrl,
 }: Props) {
   const content = (
     <div
@@ -79,7 +83,19 @@ export function MediaCard({
 
       <div className={clsx("flex items-start gap-3", variant === "artwork" ? "mt-2 px-1" : "mt-3")}>
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-text">{title}</div>
+          <div className="truncate text-sm font-semibold text-text">
+            {title}
+            {deezerId ? (
+              <span className="ml-1.5 inline-flex items-center rounded bg-[#1e1e1e] px-1 py-0.5 text-[10px] font-medium text-[#00c853]">
+                D
+              </span>
+            ) : null}
+            {previewUrl ? (
+              <span className="ml-1 inline-flex items-center rounded bg-green-600 px-1 py-0.5 text-[10px] font-bold text-white" title="Preview available">
+                ♫
+              </span>
+            ) : null}
+          </div>
           {subtitle ? (
             <div className="truncate text-xs text-muted">{subtitle}</div>
           ) : null}

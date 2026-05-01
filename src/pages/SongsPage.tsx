@@ -139,7 +139,7 @@ export function SongsPage() {
       ) : !songs.length ? (
         <EmptyState
           title="No songs found"
-          description="Import songs in Admin -> Songs -> Import iTunes, or add songs manually."
+          description="Import songs in Admin -> Songs -> Import iTunes/Deezer, or add songs manually."
         />
       ) : !filtered.length ? (
         <EmptyState title="No matches" description="Try a different query." />
@@ -158,6 +158,8 @@ export function SongsPage() {
               variant="artwork"
               to={`/songs/${song.id}`}
               imageUrl={songCoverById.get(song.id)}
+              deezerId={song.deezer_id ?? undefined}
+              previewUrl={song.preview_url ?? undefined}
             />
           ))}
         </div>
@@ -189,12 +191,26 @@ export function SongsPage() {
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold text-text">
                     {song.title}
+                    {song.deezer_id ? (
+                      <span className="ml-2 inline-flex items-center rounded bg-[#1e1e1e] px-1.5 py-0.5 text-[10px] font-medium text-[#00c853]">
+                        DEEZER
+                      </span>
+                    ) : null}
+                    {song.explicit ? (
+                      <span className="ml-1 inline-flex items-center rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                        E
+                      </span>
+                    ) : null}
                   </div>
                   <div className="truncate text-xs text-muted">
                     {artistName}
                     {albumTitle ? ` · ${albumTitle}` : ""}
                   </div>
                 </div>
+
+                {song.preview_url ? (
+                  <audio controls src={song.preview_url} className="h-6" />
+                ) : null}
 
                 <Link
                   to={`/songs/${song.id}`}

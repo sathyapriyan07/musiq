@@ -8,11 +8,15 @@ import {
 } from "../../components/admin/AdminComponents";
 import { ErrorState } from "../../components/States";
 import { searchItunesTracks, type ItunesTrack } from "../../admin/itunes";
+import { searchTracks, type DeezerTrack } from "../../services/deezer";
 import { toItunesHiResArtwork, uploadImageFromUrl } from "../../admin/storageImport";
 import { publicAssetUrl } from "../../lib/media";
 import {
   ensureAlbum,
   ensureArtistByName,
+  findSongByDeezerId,
+  ensureArtistByDeezer,
+  ensureAlbumByDeezer,
   listAlbums,
   listArtists,
   listChannels,
@@ -83,8 +87,10 @@ export function AdminSongsPage() {
   const [jioSaavnUrl, setJioSaavnUrl] = useState("");
 
   const [importOpen, setImportOpen] = useState(false);
+  const [importSource, setImportSource] = useState<"itunes" | "deezer">("itunes");
   const [importTerm, setImportTerm] = useState("");
   const [importResults, setImportResults] = useState<ItunesTrack[]>([]);
+  const [deezerResults, setDeezerResults] = useState<DeezerTrack[]>([]);
   const [importLoading, setImportLoading] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importingTrackId, setImportingTrackId] = useState<number | null>(null);
@@ -485,13 +491,89 @@ export function AdminSongsPage() {
     setImportLoading(true);
     setImportError(null);
     try {
-      const results = await searchItunesTracks(importTerm, 25);
-      setImportResults(results);
+      if (importSource === "itunes") {
+        const results = await searchItunesTracks(importTerm, 25);
+        setImportResults(results);
+        setDeezerResults([]);
+      } else {
+        const data = await searchTracks(importTerm);
+        setDeezerResults(data.data ?? []);
+        setImportResults([]);
+      }
     } catch (e) {
       setImportResults([]);
+      setDeezerResults([]);
       setImportError(e instanceof Error ? e.message : "Import search failed");
     } finally {
       setImportLoading(false);
+    }
+  }
+
+  async function importDeezerTrack(track: DeezerTrack) {
+    setImportError(null);
+    setImportingTrackId(track.id);
+    try {
+      const existing = await findSongByDeezerId(track.id);
+      if (existing.data?.id) {
+        setImportError(`Track "${track.title}" already imported (Deezer ID: ${track.id})`);
+        setImportingTrackId(null);
+        return;
+      }
+
+      const artistId = await ensureArtistByDeezer(
+        track.artist.id,
+        track.artist.name,
+        track.artist.picture_medium
+      );
+
+      const albumId = await ensureAlbumByDeezer(
+        track.album.id,
+        track.album.title,
+        artistId,
+        track.album.cover_medium,
+        undefined
+      );
+
+      if (albumId && artistId) {
+        const albumRelRes = await supabase.from("album_artists").upsert(
+          [{ album_id: albumId, artist_id: artistId, sort_order: 0 }],
+          { onConflict: "album_id,artist_id" }
+        );
+        if (albumRelRes.error) throw albumRelRes.error;
+      }
+
+      const payload = {
+        title: track.title,
+        primary_artist_id: artistId,
+        album_id: albumId,
+        track_number: null,
+        duration_seconds: track.duration,
+        preview_url: track.preview ?? null,
+        youtube_url: null,
+        cover_path: track.album.cover_medium,
+        is_published: true,
+        deezer_id: track.id,
+        explicit: track.explicit_lyrics,
+        deezer_url: track.link,
+      };
+
+      const res = await supabase.from("songs").insert(payload).select("id").single();
+      if (res.error) throw res.error;
+
+      const songId = (res.data as { id: string } | null)?.id ?? null;
+      if (songId && artistId) {
+        const relRes = await supabase.from("song_artists").upsert(
+          [{ song_id: songId, artist_id: artistId, role: "Primary", sort_order: 0 }],
+          { onConflict: "song_id,artist_id" }
+        );
+        if (relRes.error) throw relRes.error;
+      }
+
+      await refresh();
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : "Import failed");
+    } finally {
+      setImportingTrackId(null);
     }
   }
 
@@ -668,7 +750,8 @@ export function AdminSongsPage() {
           <div className="text-xs text-muted">Create, import, and manage songs.</div>
         </div>
         <div className="flex gap-2">
-          <AdminButton onClick={() => setImportOpen(true)}>Import iTunes</AdminButton>
+          <AdminButton onClick={() => { setImportSource("itunes"); setImportOpen(true); }}>Import iTunes</AdminButton>
+          <AdminButton onClick={() => { setImportSource("deezer"); setImportOpen(true); }}>Import Deezer</AdminButton>
           <AdminButton variant="primary" onClick={openCreate}>
             Add Song
           </AdminButton>
@@ -1018,7 +1101,7 @@ export function AdminSongsPage() {
 
       <AdminModal
         open={importOpen}
-        title="Import from iTunes"
+        title="Import Music"
         onClose={() => setImportOpen(false)}
         footer={
           <div className="flex justify-end gap-2">
@@ -1028,11 +1111,20 @@ export function AdminSongsPage() {
       >
         <div className="space-y-4">
           <div className="flex gap-2">
+            <select
+              value={importSource}
+              onChange={(e) => setImportSource(e.target.value as "itunes" | "deezer")}
+              className="h-11 rounded-xl border bg-panel px-4 text-sm text-text outline-none"
+            >
+              <option value="itunes">iTunes</option>
+              <option value="deezer">Deezer</option>
+            </select>
             <input
               value={importTerm}
               onChange={(e) => setImportTerm(e.target.value)}
               className="h-11 w-full rounded-xl border bg-panel px-4 text-sm text-text outline-none focus:ring-2 focus:ring-[color:var(--ring)]"
-              placeholder="Search artist or song… (e.g. The Weeknd)"
+              placeholder={importSource === "deezer" ? "Search Deezer… (e.g. The Weeknd)" : "Search artist or song… (e.g. The Weeknd)"}
+              onKeyDown={(e) => { if (e.key === "Enter") void runImportSearch(); }}
             />
             <AdminButton variant="primary" onClick={() => void runImportSearch()} disabled={importLoading}>
               {importLoading ? "Searching…" : "Search"}
@@ -1041,7 +1133,7 @@ export function AdminSongsPage() {
 
           {importError ? <ErrorState title="Import error" description={importError} /> : null}
 
-          {!importLoading && !importResults.length ? (
+          {!importLoading && !importResults.length && !deezerResults.length ? (
             <div className="rounded-xl border bg-panel2 p-4 text-sm text-muted">
               Search for a track, then click Import.
             </div>
@@ -1087,6 +1179,46 @@ export function AdminSongsPage() {
                       disabled={importingTrackId === t.trackId}
                     >
                       {importingTrackId === t.trackId ? "Importing…" : "Import"}
+                    </AdminButton>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {deezerResults.length ? (
+            <div className="divide-y rounded-xl border bg-panel">
+              {deezerResults.map((t) => (
+                <div key={t.id} className="flex items-center gap-3 px-4 py-3">
+                  {t.album.cover_medium ? (
+                    <img
+                      src={t.album.cover_medium}
+                      alt=""
+                      className="h-12 w-12 rounded-lg border object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="h-12 w-12 rounded-lg border bg-panel2" />
+                  )}
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-text">
+                      {t.title}
+                    </div>
+                    <div className="truncate text-xs text-muted">
+                      {t.artist.name}
+                      {t.album.title ? ` · ${t.album.title}` : ""}
+                    </div>
+                    {t.preview ? (
+                      <audio controls src={t.preview} className="mt-1 h-6" />
+                    ) : null}
+                  </div>
+                  <div className="ml-auto">
+                    <AdminButton
+                      variant="primary"
+                      onClick={() => void importDeezerTrack(t)}
+                      disabled={importingTrackId === t.id}
+                    >
+                      {importingTrackId === t.id ? "Importing…" : "Import"}
                     </AdminButton>
                   </div>
                 </div>

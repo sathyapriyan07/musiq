@@ -7,6 +7,8 @@ export type ArtistRow = {
   image_path: string | null;
   is_published: boolean;
   updated_at: string;
+  deezer_id: number | null;
+  deezer_url: string | null;
 };
 
 export type AlbumRow = {
@@ -17,6 +19,8 @@ export type AlbumRow = {
   cover_path: string | null;
   is_published: boolean;
   updated_at: string;
+  deezer_id: number | null;
+  deezer_url: string | null;
 };
 
 export type SongRow = {
@@ -31,6 +35,9 @@ export type SongRow = {
   cover_path: string | null;
   is_published: boolean;
   updated_at: string;
+  deezer_id: number | null;
+  explicit: boolean;
+  deezer_url: string | null;
 };
 
 export type ChannelRow = {
@@ -107,6 +114,85 @@ export async function ensureAlbum(title: string, artistId: string | null) {
   const created = await supabase
     .from("albums")
     .insert({ title: trimmed, artist_id: artistId, is_published: true })
+    .select("id")
+    .single();
+
+  if (created.error) throw created.error;
+  return created.data.id as string;
+}
+
+export async function findSongByDeezerId(deezerId: number) {
+  const res = await supabase
+    .from("songs")
+    .select("id, title, deezer_id")
+    .eq("deezer_id", deezerId)
+    .maybeSingle();
+  return res;
+}
+
+export async function findArtistByDeezerId(deezerId: number) {
+  const res = await supabase
+    .from("artists")
+    .select("id, name, deezer_id")
+    .eq("deezer_id", deezerId)
+    .maybeSingle();
+  return res;
+}
+
+export async function findAlbumByDeezerId(deezerId: number) {
+  const res = await supabase
+    .from("albums")
+    .select("id, title, deezer_id")
+    .eq("deezer_id", deezerId)
+    .maybeSingle();
+  return res;
+}
+
+export async function ensureArtistByDeezer(
+  deezerId: number,
+  name: string,
+  picture: string
+) {
+  const existing = await findArtistByDeezerId(deezerId);
+  if (existing.data?.id) return existing.data.id as string;
+
+  const created = await supabase
+    .from("artists")
+    .insert({
+      name,
+      deezer_id: deezerId,
+      deezer_url: `https://www.deezer.com/artist/${deezerId}`,
+      image_path: picture,
+      is_published: true,
+    })
+    .select("id")
+    .single();
+
+  if (created.error) throw created.error;
+  return created.data.id as string;
+}
+
+export async function ensureAlbumByDeezer(
+  deezerId: number,
+  title: string,
+  artistId: string | null,
+  cover: string,
+  releaseDate?: string
+) {
+  const existing = await findAlbumByDeezerId(deezerId);
+  if (existing.data?.id) return existing.data.id as string;
+
+  const created = await supabase
+    .from("albums")
+    .insert({
+      title,
+      deezer_id: deezerId,
+      deezer_url: `https://www.deezer.com/album/${deezerId}`,
+      artist_id: artistId,
+      cover_path: cover,
+      release_date: releaseDate ?? null,
+      is_published: true,
+    })
     .select("id")
     .single();
 
