@@ -248,7 +248,7 @@ export function AdminArtistsPage() {
             />
           </div>
 
-          <div className="rounded-2xl border bg-panel2 p-4">
+          <div className="p-4">
             <div className="text-xs font-semibold uppercase tracking-wider text-muted">
               Artist image
             </div>

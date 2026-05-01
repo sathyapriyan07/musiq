@@ -17,7 +17,7 @@ function Panel({
   return (
     <div
       className={clsx(
-        "rounded-2xl border bg-panel p-6 text-center surface shadow-soft",
+        "p-6 text-center",
         className,
       )}
     >

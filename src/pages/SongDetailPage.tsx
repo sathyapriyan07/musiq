@@ -19,7 +19,7 @@ import {
 } from "../lib/publicQueries";
 import { isSupabaseConfigured } from "../lib/supabaseClient";
 
-function PreviewPlayer({ src, title }: { src: string; title: string }) {
+function PreviewPlayer({ src }: { src: string }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -30,7 +30,7 @@ function PreviewPlayer({ src, title }: { src: string; title: string }) {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-
+ 
     const onLoaded = () => {
       setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
     };
@@ -41,13 +41,13 @@ function PreviewPlayer({ src, title }: { src: string; title: string }) {
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
     const onEnded = () => setIsPlaying(false);
-
+ 
     audio.addEventListener("loadedmetadata", onLoaded);
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("play", onPlay);
     audio.addEventListener("pause", onPause);
     audio.addEventListener("ended", onEnded);
-
+ 
     return () => {
       audio.removeEventListener("loadedmetadata", onLoaded);
       audio.removeEventListener("timeupdate", onTime);
@@ -82,41 +82,39 @@ function PreviewPlayer({ src, title }: { src: string; title: string }) {
   }
 
   return (
-    <div className="rounded-2xl border bg-panel2 p-4">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={toggle}
-          className="inline-flex h-12 w-12 items-center justify-center rounded-full border bg-panel text-text hover:bg-panel"
-          aria-label={isPlaying ? "Pause preview" : "Play preview"}
-          title={isPlaying ? "Pause" : "Play"}
-        >
-          <span className="text-lg">{isPlaying ? "❚❚" : "▶"}</span>
-        </button>
-
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-text">{title}</div>
-          <div className="mt-2">
-            <input
-              type="range"
-              min={0}
-              max={max}
-              step={0.1}
-              value={Math.min(progress, max)}
-              onChange={(e) => onSeekStart(Number(e.target.value))}
-              onMouseUp={(e) => onSeekEnd(Number((e.target as HTMLInputElement).value))}
-              onTouchEnd={(e) => onSeekEnd(Number((e.target as HTMLInputElement).value))}
-              className="h-2 w-full cursor-pointer accent-[color:var(--accent)]"
-              aria-label="Seek preview"
-            />
-            <div className="mt-1 flex items-center justify-between text-xs text-muted">
+    <div className="space-y-3">
+      <div className="text-sm font-semibold text-text">Preview</div>
+      <div className="bg-panel2 p-4">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={toggle}
+            className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-panel text-text hover:bg-panel2"
+            aria-label={isPlaying ? "Pause preview" : "Play preview"}
+            title={isPlaying ? "Pause" : "Play"}
+          >
+            <span className="text-lg">{isPlaying ? "❚❚" : "▶"}</span>
+          </button>
+          <div className="min-w-0 flex-1">
+            <div className="mt-2">
+              <input
+                type="range"
+                min={0}
+                max={max}
+                value={progress}
+                onChange={(e) => onSeekStart(Number(e.target.value))}
+                onMouseUp={() => onSeekEnd(progress)}
+                onKeyUp={() => onSeekEnd(progress)}
+                className="w-full"
+              />
+            </div>
+            <div className="mt-1 flex justify-between text-xs text-muted">
               <span>{timeLabel}</span>
               <span>{durationLabel}</span>
             </div>
           </div>
         </div>
       </div>
-
       <audio ref={audioRef} src={src} preload="metadata" />
     </div>
   );
@@ -347,9 +345,9 @@ export function SongDetailPage() {
             <div className="space-y-3">
               <div className="text-sm font-semibold text-text">Preview</div>
               {song.preview_url ? (
-                <PreviewPlayer src={song.preview_url} title="Preview" />
+                <PreviewPlayer src={song.preview_url} />
               ) : (
-                <div className="rounded-2xl border bg-panel2 p-4 text-sm text-muted">
+                <div className="p-4 text-sm text-muted">
                   No preview available.
                 </div>
               )}

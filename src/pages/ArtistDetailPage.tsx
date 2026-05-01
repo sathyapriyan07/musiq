@@ -160,7 +160,7 @@ export function ArtistDetailPage() {
           </div>
 
           <div className="space-y-5">
-            <div className="rounded-2xl border bg-panel p-5">
+            <div className="p-5">
               <div className="text-lg font-bold text-text">About</div>
               <div className="mt-2 text-sm text-muted">
                 {artist.bio ? artist.bio : "No biography yet."}

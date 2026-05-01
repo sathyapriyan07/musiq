@@ -950,7 +950,7 @@ export function AdminSongsPage() {
             />
           </div>
 
-          <div className="rounded-2xl border bg-panel2 p-4">
+          <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-muted">
               Streaming links
             </div>
