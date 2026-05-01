@@ -34,6 +34,7 @@ export function AlbumDetailPage() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [songArtists, setSongArtists] = useState<Record<string, Artist>>({});
   const [songCredits, setSongCredits] = useState<Record<string, SongArtistCredit[]>>({});
+  const [songViewMode, setSongViewMode] = useState<"grid" | "list">("grid");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -232,7 +233,46 @@ export function AlbumDetailPage() {
               <EmptyState title="No tracks yet" description="Import songs for this album, or add them in Admin." />
             ) : (
               <div className="w-full max-w-4xl">
-                <div className="grid grid-cols-4 gap-3">{trackRows}</div>
+                <div className="mb-3 flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => setSongViewMode("grid")}
+                    className={`rounded-lg p-2 ${songViewMode === "grid" ? "bg-panel2" : "hover:bg-panel2"}`}
+                    title="Grid view"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                  </button>
+                  <button
+                    onClick={() => setSongViewMode("list")}
+                    className={`rounded-lg p-2 ${songViewMode === "list" ? "bg-panel2" : "hover:bg-panel2"}`}
+                    title="List view"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="17" width="18" height="4" rx="1"/></svg>
+                  </button>
+                </div>
+                {songViewMode === "grid" ? (
+                  <div className="grid grid-cols-4 gap-3">{trackRows}</div>
+                ) : (
+                  <div className="space-y-1">
+                    {songs.map((s) => {
+                      const songArtist = s.primary_artist_id ? songArtists[s.primary_artist_id] : null;
+                      const creditedNames = formatCreditNames(songCredits[s.id] ?? []);
+                      const displayArtist = creditedNames ?? songArtist?.name ?? null;
+                      const songCoverUrl = publicAssetUrl("covers", s.cover_path);
+                      return (
+                        <Link key={s.id} to={`/songs/${s.id}`} className="flex items-center gap-3 rounded-xl p-2 hover:bg-panel2">
+                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-panel2">
+                            {songCoverUrl ? <img src={songCoverUrl} alt="" className="h-full w-full object-cover" /> : null}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-semibold text-text">{s.title}</div>
+                            {displayArtist ? <div className="truncate text-xs text-muted">{displayArtist}</div> : null}
+                          </div>
+                          {s.duration_seconds ? <div className="text-xs text-muted">{Math.floor(s.duration_seconds / 60)}:{(s.duration_seconds % 60).toString().padStart(2, "0")}</div> : null}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 

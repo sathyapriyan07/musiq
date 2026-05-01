@@ -3,7 +3,7 @@ import { MediaCard } from "../components/MediaCard";
 import { EmptyState, ErrorState } from "../components/States";
 import { PageHeader, SectionHeader } from "../components/Page";
 import { publicAssetUrl } from "../lib/media";
-import { getAlbums, getArtists, getSongs, getArtist, type Album, type Artist, type Song } from "../lib/publicQueries";
+import { getAlbums, getArtists, getSongs, type Album, type Artist, type Song } from "../lib/publicQueries";
 import { isSupabaseConfigured } from "../lib/supabaseClient";
 
 export function HomePage() {
@@ -38,16 +38,10 @@ export function HomePage() {
       setAlbums(((albumsRes.data ?? []) as Album[]).slice(0, 8));
       setArtists(((artistsRes.data ?? []) as Artist[]).slice(0, 8));
 
-      const songArtistIds = [...new Set(songs.map(s => s.primary_artist_id).filter((id): id is string => !!id))];
-      const albumArtistIds = [...new Set(albums.map(a => a.artist_id).filter((id): id is string => !!id))];
-      const allArtistIds = [...new Set([...songArtistIds, ...albumArtistIds])];
-      if (allArtistIds.length) {
-        const results = await Promise.all(allArtistIds.map(id => getArtist(id)));
-        const artistMap: Record<string, Artist> = {};
-        results.forEach(r => { if (r.data) artistMap[(r.data as Artist).id] = r.data as Artist; });
-        setSongArtists(artistMap);
-        setAlbumArtists(artistMap);
-      }
+      const artistMap: Record<string, Artist> = {};
+      ((artistsRes.data ?? []) as Artist[]).forEach(a => { artistMap[a.id] = a; });
+      setSongArtists(artistMap);
+      setAlbumArtists(artistMap);
       setLoading(false);
     }
     void run();

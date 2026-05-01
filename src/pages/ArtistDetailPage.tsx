@@ -21,6 +21,8 @@ export function ArtistDetailPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [songCredits, setSongCredits] = useState<ArtistSongCredit[]>([]);
   const [showAllSongs, setShowAllSongs] = useState(false);
+  const [albumViewMode, setAlbumViewMode] = useState<"grid" | "list">("grid");
+  const [songViewMode, setSongViewMode] = useState<"grid" | "list">("grid");
   const [relatedArtists, setRelatedArtists] = useState<{ id: string; name: string; image_path: string | null }[]>([]);
   const [visibleRelatedArtists, setVisibleRelatedArtists] = useState(4);
   const [songAlbums, setSongAlbums] = useState<Record<string, Album>>({});
@@ -193,20 +195,79 @@ export function ArtistDetailPage() {
 
             {albums.length ? (
               <section className="space-y-3">
-                <div className="text-sm font-semibold text-text">Albums</div>
-                <div className="grid grid-cols-4 gap-3">{albumCards}</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold text-text">Albums</div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setAlbumViewMode("grid")} className={`rounded-lg p-2 ${albumViewMode === "grid" ? "bg-panel2" : "hover:bg-panel2"}`} title="Grid view">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    </button>
+                    <button onClick={() => setAlbumViewMode("list")} className={`rounded-lg p-2 ${albumViewMode === "list" ? "bg-panel2" : "hover:bg-panel2"}`} title="List view">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="17" width="18" height="4" rx="1"/></svg>
+                    </button>
+                  </div>
+                </div>
+                {albumViewMode === "grid" ? (
+                  <div className="grid grid-cols-4 gap-3">{albumCards}</div>
+                ) : (
+                  <div className="space-y-1">
+                    {albums.map((a) => {
+                      const coverUrl = a.cover_path ? publicAssetUrl("covers", a.cover_path) ?? undefined : undefined;
+                      return (
+                        <Link key={a.id} to={`/albums/${a.id}`} className="flex items-center gap-3 rounded-xl p-2 hover:bg-panel2">
+                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-panel2">
+                            {coverUrl ? <img src={coverUrl} alt="" className="h-full w-full object-cover" /> : null}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-semibold text-text">{a.title}</div>
+                            {a.release_date ? <div className="truncate text-xs text-muted">{a.release_date}</div> : null}
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </section>
             ) : null}
 
             {songCredits.length ? (
               <section className="space-y-3">
-                <div className="text-sm font-semibold text-text">Songs</div>
-                <div className="grid grid-cols-4 gap-3">{songCards}</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold text-text">Songs</div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setSongViewMode("grid")} className={`rounded-lg p-2 ${songViewMode === "grid" ? "bg-panel2" : "hover:bg-panel2"}`} title="Grid view">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    </button>
+                    <button onClick={() => setSongViewMode("list")} className={`rounded-lg p-2 ${songViewMode === "list" ? "bg-panel2" : "hover:bg-panel2"}`} title="List view">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="17" width="18" height="4" rx="1"/></svg>
+                    </button>
+                  </div>
+                </div>
+                {songViewMode === "grid" ? (
+                  <div className="grid grid-cols-4 gap-3">{songCards}</div>
+                ) : (
+                  <div className="space-y-1">
+                    {displayedSongCredits.map((c) => {
+                      const s = (Array.isArray(c.song) ? c.song[0] : c.song) ?? null;
+                      if (!s) return null;
+                      const role = c.role?.trim() || (s.primary_artist_id === artist?.id ? "Primary" : "");
+                      const songCoverUrl = publicAssetUrl("covers", s.cover_path);
+                      return (
+                        <Link key={`${s.id}:${c.sort_order ?? 0}`} to={`/songs/${s.id}`} className="flex items-center gap-3 rounded-xl p-2 hover:bg-panel2">
+                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-panel2">
+                            {songCoverUrl ? <img src={songCoverUrl} alt="" className="h-full w-full object-cover" /> : null}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-semibold text-text">{s.title}</div>
+                            {role ? <div className="truncate text-xs text-muted">{role}</div> : null}
+                          </div>
+                          {s.duration_seconds ? <div className="text-xs text-muted">{Math.floor(s.duration_seconds / 60)}:{(s.duration_seconds % 60).toString().padStart(2, "0")}</div> : null}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
                 {!showAllSongs && songCredits.length > 16 && (
-                  <button
-                    onClick={() => setShowAllSongs(true)}
-                    className="text-sm font-medium text-accent hover:underline"
-                  >
+                  <button onClick={() => setShowAllSongs(true)} className="text-sm font-medium text-accent hover:underline">
                     View More
                   </button>
                 )}
