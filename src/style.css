@@ -80,13 +80,6 @@ body {
     display: none;
   }
 
-  .line-clamp-2 {
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-  }
-
   .surface {
     background: var(--panel);
     backdrop-filter: blur(16px);

@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MediaCard } from "../components/MediaCard";
 import { EmptyState, ErrorState } from "../components/States";
 import { publicAssetUrl } from "../lib/media";
@@ -20,9 +20,6 @@ export function ArtistDetailPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [songCredits, setSongCredits] = useState<ArtistSongCredit[]>([]);
   const [songAlbums, setSongAlbums] = useState<Record<string, Album>>({});
-  const albumsScrollerRef = useRef<HTMLDivElement | null>(null);
-  const [albumsCanScrollLeft, setAlbumsCanScrollLeft] = useState(false);
-  const [albumsCanScrollRight, setAlbumsCanScrollRight] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,67 +89,16 @@ export function ArtistDetailPage() {
     };
   }, [artistId]);
 
-  useEffect(() => {
-    function update() {
-      const el = albumsScrollerRef.current;
-      if (!el) {
-        setAlbumsCanScrollLeft(false);
-        setAlbumsCanScrollRight(false);
-        return;
-      }
-      const maxScrollLeft = el.scrollWidth - el.clientWidth;
-      setAlbumsCanScrollLeft(el.scrollLeft > 0);
-      setAlbumsCanScrollRight(el.scrollLeft < maxScrollLeft - 1);
-    }
-
-    update();
-    window.addEventListener("resize", update);
-    const el = albumsScrollerRef.current;
-    el?.addEventListener("scroll", update, { passive: true });
-
-    return () => {
-      window.removeEventListener("resize", update);
-      el?.removeEventListener("scroll", update);
-    };
-  }, [albums.length]);
-
-  function scrollAlbums(direction: -1 | 1) {
-    const el = albumsScrollerRef.current;
-    if (!el) return;
-    const delta = Math.max(240, Math.floor(el.clientWidth * 0.85));
-    el.scrollBy({ left: direction * delta, behavior: "smooth" });
-  }
-
   const albumCards = useMemo(() => {
     return albums.map((a) => (
-      <Link key={a.id} to={`/albums/${a.id}`} className="block w-52 shrink-0 snap-start md:w-56">
-        <div className="group">
-          <div className="aspect-square overflow-hidden rounded-2xl bg-panel2 shadow-soft">
-            {a.cover_path ? (
-              <img
-                src={publicAssetUrl("covers", a.cover_path) ?? undefined}
-                alt=""
-                loading="lazy"
-                className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-muted">
-                <span className="text-xs uppercase tracking-wider">No Image</span>
-              </div>
-            )}
-          </div>
-
-          <div className="mt-3 space-y-1 px-1">
-            <div className="line-clamp-2 text-sm font-semibold leading-snug text-text">{a.title}</div>
-            {(() => {
-              if (!a.release_date) return null;
-              const d = new Date(a.release_date);
-              if (!Number.isFinite(d.getTime())) return null;
-              return <div className="text-xs text-muted">{d.getFullYear()}</div>;
-            })()}
-          </div>
-        </div>
-      </Link>
+      <MediaCard
+        key={a.id}
+        title={a.title}
+        subtitle="Album"
+        aspect="poster"
+        to={`/albums/${a.id}`}
+        imageUrl={publicAssetUrl("covers", a.cover_path) ?? undefined}
+      />
     ));
   }, [albums]);
 
@@ -223,40 +169,8 @@ export function ArtistDetailPage() {
 
             {albums.length ? (
               <section className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-2xl font-bold text-text">Albums</div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => scrollAlbums(-1)}
-                      disabled={!albumsCanScrollLeft}
-                      aria-label="Scroll albums left"
-                      className="surface flex h-9 w-9 items-center justify-center rounded-full border text-text shadow-soft transition hover:bg-panel2 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => scrollAlbums(1)}
-                      disabled={!albumsCanScrollRight}
-                      aria-label="Scroll albums right"
-                      className="surface flex h-9 w-9 items-center justify-center rounded-full border text-text shadow-soft transition hover:bg-panel2 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                <div
-                  ref={albumsScrollerRef}
-                  className="no-scrollbar -mx-2 flex snap-x snap-mandatory gap-6 overflow-x-auto px-2 pb-2"
-                >
-                  {albumCards}
-                </div>
+                <div className="text-sm font-semibold text-text">Albums</div>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{albumCards}</div>
               </section>
             ) : null}
 
