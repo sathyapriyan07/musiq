@@ -1,7 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { EmptyState, ErrorState } from "../components/States";
-import { publicAssetUrl, formatDuration } from "../lib/media";
+import { publicAssetUrl } from "../lib/media";
 import {
   getAlbum,
   getArtist,
@@ -115,7 +115,6 @@ export function AlbumDetailPage() {
 
   const trackRows = useMemo(() => {
     return songs.map((s) => {
-      const duration = formatDuration(s.duration_seconds);
       const songArtist = s.primary_artist_id ? songArtists[s.primary_artist_id] : null;
       const creditedNames = formatCreditNames(songCredits[s.id] ?? []);
       const displayArtist = creditedNames ?? songArtist?.name ?? null;
@@ -124,17 +123,17 @@ export function AlbumDetailPage() {
         <Link
           key={s.id}
           to={`/songs/${s.id}`}
-          className="flex items-center gap-3 px-4 py-3 hover:bg-panel2 overflow-hidden"
+          className="group block"
         >
-          <div className="w-6 shrink-0 text-right text-xs text-muted">{s.track_number ?? "—"}</div>
-          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-panel2">
-            {songCoverUrl ? <img src={songCoverUrl} alt="" className="h-full w-full object-contain" loading="lazy" /> : null}
+          <div className="aspect-square overflow-hidden rounded-xl bg-panel2">
+            {songCoverUrl ? (
+              <img src={songCoverUrl} alt="" className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.02]" loading="lazy" />
+            ) : null}
           </div>
-          <div className="min-w-0 flex-1 overflow-hidden">
+          <div className="mt-2">
             <div className="truncate text-sm font-semibold text-text">{s.title}</div>
             {displayArtist ? <div className="truncate text-xs text-muted">{displayArtist}</div> : null}
           </div>
-          {duration ? <div className="ml-auto shrink-0 text-xs text-muted">{duration}</div> : null}
         </Link>
       );
     });
@@ -208,8 +207,8 @@ export function AlbumDetailPage() {
             {!songs.length ? (
               <EmptyState title="No tracks yet" description="Import songs for this album, or add them in Admin." />
             ) : (
-              <div className="w-full max-w-2xl overflow-x-auto">
-                <div className="flex flex-col gap-1">{trackRows}</div>
+              <div className="w-full max-w-4xl">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-5">{trackRows}</div>
               </div>
             )}
           </div>
