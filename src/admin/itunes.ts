@@ -8,6 +8,7 @@ export type ItunesTrack = {
   artworkUrl100?: string;
   trackTimeMillis?: number;
   trackNumber?: number;
+  trackViewUrl?: string;
 };
 
 export async function searchItunesTracks(term: string, limit = 25): Promise<ItunesTrack[]> {
@@ -41,6 +42,7 @@ export async function searchItunesTracks(term: string, limit = 25): Promise<Itun
       artworkUrl100: r.artworkUrl100,
       trackTimeMillis: r.trackTimeMillis,
       trackNumber: r.trackNumber,
+      trackViewUrl: r.trackViewUrl,
     }));
 }
 

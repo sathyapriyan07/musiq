@@ -318,8 +318,8 @@ export function SongDetailPage() {
               )}
             </div>
 
-            <div className="rounded-2xl border bg-panel p-5">
-              <div className="text-lg font-bold text-text">Channels</div>
+            <div>
+              <div className="text-lg font-bold text-text">Labels</div>
               {!channels.length ? (
                 <div className="mt-2 text-sm text-muted">No channels assigned.</div>
               ) : (
@@ -331,7 +331,7 @@ export function SongDetailPage() {
                     return (
                       <div
                         key={`${c.channel_id}:${c.sort_order ?? 0}`}
-                        className="flex items-center gap-2 rounded-full border bg-panel2 px-3 py-2"
+                        className="flex items-center gap-2 rounded-full bg-panel2 px-3 py-2"
                       >
                         <div className="h-7 w-7 overflow-hidden rounded-full bg-panel">
                           {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : null}
