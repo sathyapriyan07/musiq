@@ -3,13 +3,15 @@ import { MediaCard } from "../components/MediaCard";
 import { EmptyState, ErrorState } from "../components/States";
 import { PageHeader, SectionHeader } from "../components/Page";
 import { publicAssetUrl } from "../lib/media";
-import { getAlbums, getArtists, getSongs, type Album, type Artist, type Song } from "../lib/publicQueries";
+import { getAlbums, getArtists, getSongs, getArtist, type Album, type Artist, type Song } from "../lib/publicQueries";
 import { isSupabaseConfigured } from "../lib/supabaseClient";
 
 export function HomePage() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
+  const [songArtists, setSongArtists] = useState<Record<string, Artist>>({});
+  const [albumArtists, setAlbumArtists] = useState<Record<string, Artist>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,6 +37,17 @@ export function HomePage() {
       setSongs((songsRes.data ?? []) as Song[]);
       setAlbums(((albumsRes.data ?? []) as Album[]).slice(0, 8));
       setArtists(((artistsRes.data ?? []) as Artist[]).slice(0, 8));
+
+      const songArtistIds = [...new Set(songs.map(s => s.primary_artist_id).filter((id): id is string => !!id))];
+      const albumArtistIds = [...new Set(albums.map(a => a.artist_id).filter((id): id is string => !!id))];
+      const allArtistIds = [...new Set([...songArtistIds, ...albumArtistIds])];
+      if (allArtistIds.length) {
+        const results = await Promise.all(allArtistIds.map(id => getArtist(id)));
+        const artistMap: Record<string, Artist> = {};
+        results.forEach(r => { if (r.data) artistMap[(r.data as Artist).id] = r.data as Artist; });
+        setSongArtists(artistMap);
+        setAlbumArtists(artistMap);
+      }
       setLoading(false);
     }
     void run();
@@ -44,30 +57,38 @@ export function HomePage() {
   }, []);
 
   const songCards = useMemo(() => {
-    return songs.map((s) => (
-      <MediaCard
-        key={s.id}
-        title={s.title}
-        subtitle="Song"
-        to={`/songs/${s.id}`}
-        imageUrl={publicAssetUrl("covers", s.cover_path) ?? undefined}
-        className="w-[220px] shrink-0"
-      />
-    ));
-  }, [songs]);
+    return songs.map((s) => {
+      const artist = s.primary_artist_id ? songArtists[s.primary_artist_id] : null;
+      return (
+        <MediaCard
+          key={s.id}
+          title={s.title}
+          subtitle={artist?.name ?? "Song"}
+          to={`/songs/${s.id}`}
+          imageUrl={publicAssetUrl("covers", s.cover_path) ?? undefined}
+          variant="artwork"
+          className="w-[220px] shrink-0"
+        />
+      );
+    });
+  }, [songs, songArtists]);
 
   const albumCards = useMemo(() => {
-    return albums.map((a) => (
-      <MediaCard
-        key={a.id}
-        title={a.title}
-        subtitle="Album"
-        to={`/albums/${a.id}`}
-        imageUrl={publicAssetUrl("covers", a.cover_path) ?? undefined}
-        className="w-[190px] shrink-0"
-      />
-    ));
-  }, [albums]);
+    return albums.map((a) => {
+      const artist = a.artist_id ? albumArtists[a.artist_id] : null;
+      return (
+        <MediaCard
+          key={a.id}
+          title={a.title}
+          subtitle={artist?.name ?? "Album"}
+          to={`/albums/${a.id}`}
+          imageUrl={publicAssetUrl("covers", a.cover_path) ?? undefined}
+          variant="artwork"
+          className="w-[190px] shrink-0"
+        />
+      );
+    });
+  }, [albums, albumArtists]);
 
   const artistCards = useMemo(() => {
     return artists.map((a) => (
@@ -76,6 +97,7 @@ export function HomePage() {
         title={a.name}
         subtitle="Artist"
         shape="round"
+        variant="artwork"
         to={`/artists/${a.id}`}
         imageUrl={publicAssetUrl("avatars", a.image_path) ?? undefined}
         className="w-[160px] shrink-0"
