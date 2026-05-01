@@ -349,7 +349,6 @@ export function SongDetailPage() {
             </div>
 
             <div className="space-y-3">
-              <div className="text-sm font-semibold text-text">Preview</div>
               {song.preview_url ? (
                 <PreviewPlayer src={song.preview_url} />
               ) : (

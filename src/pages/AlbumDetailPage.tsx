@@ -184,17 +184,21 @@ export function AlbumDetailPage() {
             <div className="mt-4 space-y-1">
               <div className="text-lg font-bold text-text">{album.title}</div>
               {artist ? (
-                <Link to={`/artists/${artist.id}`} className="mx-auto mt-2 block w-12 overflow-hidden rounded-full bg-panel2">
-                  {artist.image_path ? (
-                    <img src={publicAssetUrl("avatars", artist.image_path) ?? undefined} alt="" className="h-full w-full object-cover" loading="lazy" />
-                  ) : (
-                    <div className="flex aspect-square items-center justify-center text-muted">
-                      <span className="text-xs uppercase tracking-wider">No Image</span>
-                    </div>
-                  )}
+                <Link to={`/artists/${artist.id}`} className="mt-2 inline-flex items-center gap-2">
+                  <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-panel2">
+                    {artist.image_path ? (
+                      <img src={publicAssetUrl("avatars", artist.image_path) ?? undefined} alt="" className="h-full w-full object-cover" loading="lazy" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-muted">
+                        <span className="text-[10px] uppercase tracking-wider">No Image</span>
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-sm text-muted">{artist.name}</span>
                 </Link>
-              ) : null}
-              <div className="text-sm text-muted">{artist?.name ?? "—"}</div>
+              ) : (
+                <div className="text-sm text-muted">—</div>
+              )}
               {channels.length ? (
                 <div className="pt-2">
                   <div className="flex flex-wrap justify-center gap-2">
