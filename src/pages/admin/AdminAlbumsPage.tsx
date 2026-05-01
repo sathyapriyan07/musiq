@@ -327,8 +327,17 @@ export function AdminAlbumsPage() {
     setImportError(null);
     setImportingAlbumId(album.collectionId);
     try {
-      const artistId = await ensureArtistByName(album.artistName);
+      const artistNames = album.artistName.split(/[,&]/).map((name) => name.trim()).filter(Boolean);
+      const artistIds: string[] = [];
 
+      for (const name of artistNames) {
+        const id = await ensureArtistByName(name);
+        if (id && !artistIds.includes(id)) {
+          artistIds.push(id);
+        }
+      }
+
+      const primaryArtistId = artistIds[0] ?? null;
       let coverPath: string | null = null;
       if (album.artworkUrl100) {
         const artworkUrl = toItunesHiResArtwork(album.artworkUrl100);
@@ -349,7 +358,7 @@ export function AdminAlbumsPage() {
 
       const payload = {
         title: album.collectionName,
-        artist_id: artistId,
+        artist_id: primaryArtistId,
         cover_path: coverPath,
         release_date: releaseDate,
         is_published: true,
@@ -359,11 +368,15 @@ export function AdminAlbumsPage() {
       if (res.error) throw res.error;
 
       const albumId = (res.data as { id: string } | null)?.id ?? null;
-      if (albumId && artistId) {
-        const relRes = await supabase.from("album_artists").insert({
+      if (albumId && artistIds.length > 0) {
+        const artistRelations = artistIds.map((artistId, index) => ({
           album_id: albumId,
           artist_id: artistId,
-          sort_order: 0,
+          sort_order: index,
+        }));
+
+        const relRes = await supabase.from("album_artists").upsert(artistRelations, {
+          onConflict: "album_id,artist_id",
         });
         if (relRes.error) throw relRes.error;
       }
@@ -379,7 +392,7 @@ export function AdminAlbumsPage() {
       }
 
       if (albumId) {
-        await importAlbumSongs(album, albumId, artistId);
+        await importAlbumSongs(album, albumId, primaryArtistId);
       }
 
       await refresh();
