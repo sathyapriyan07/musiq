@@ -204,23 +204,12 @@ export function AlbumDetailPage() {
             </div>
           </div>
 
-          <div className="space-y-5">
-            <div>
-              <div className="text-lg font-bold text-text">Tracklist</div>
-              <div className="mt-2 text-sm text-muted">
-                {artist?.name ? `Artist: ${artist.name}` : "Artist: —"}
-                {album.release_date ? ` · Release: ${album.release_date}` : ""}
-              </div>
-            </div>
-
+          <div className="flex flex-col items-center">
             {!songs.length ? (
               <EmptyState title="No tracks yet" description="Import songs for this album, or add them in Admin." />
             ) : (
-              <div>
-                <div className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted">
-                  Tracks
-                </div>
-                <div>{trackRows}</div>
+              <div className="w-full max-w-2xl">
+                <div className="no-scrollbar flex max-h-96 flex-col gap-1 overflow-y-auto">{trackRows}</div>
               </div>
             )}
           </div>

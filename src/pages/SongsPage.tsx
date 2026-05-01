@@ -162,7 +162,7 @@ export function SongsPage() {
           ))}
         </div>
       ) : (
-        <div className="divide-y rounded-2xl border bg-panel surface shadow-soft">
+        <div>
           {filtered.map((song) => {
             const artistName =
               formatCreditNames(songCredits[song.id] ?? []) ??

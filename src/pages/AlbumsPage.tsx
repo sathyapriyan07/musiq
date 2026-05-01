@@ -53,7 +53,7 @@ export function AlbumsPage() {
       />
 
       {loading ? (
-        <div className="rounded-2xl border bg-panel p-6 text-sm text-muted surface shadow-soft">
+        <div className="p-6 text-sm text-muted">
           Loading...
         </div>
       ) : error ? (

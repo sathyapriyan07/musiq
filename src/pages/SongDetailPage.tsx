@@ -284,7 +284,7 @@ export function SongDetailPage() {
               </div>
             ) : null}
 
-            <div className="rounded-2xl border bg-panel p-5">
+            <div>
               <div className="text-lg font-bold text-text">Artists</div>
               {!displayCredits.length ? (
                 <div className="mt-2 text-sm text-muted">No artists credited.</div>
