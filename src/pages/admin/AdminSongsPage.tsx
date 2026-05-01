@@ -522,28 +522,30 @@ export function AdminSongsPage() {
       }
 
       let coverPath: string | null = null;
-      if (albumId && track.artworkUrl100) {
+      if (track.artworkUrl100) {
         const artworkUrl = toItunesHiResArtwork(track.artworkUrl100);
         coverPath = await uploadImageFromUrl({
           bucketId: "covers",
           url: artworkUrl,
-          pathWithoutExt: `albums/${albumId}`,
+          pathWithoutExt: `songs/${track.trackId}`,
         });
 
-        const releaseDate = track.releaseDate
-          ? (() => {
-              const d = new Date(track.releaseDate);
-              if (Number.isNaN(d.getTime())) return null;
-              return d.toISOString().slice(0, 10);
-            })()
-          : null;
+        if (albumId) {
+          const releaseDate = track.releaseDate
+            ? (() => {
+                const d = new Date(track.releaseDate);
+                if (Number.isNaN(d.getTime())) return null;
+                return d.toISOString().slice(0, 10);
+              })()
+            : null;
 
-        const updatePayload: { cover_path: string; release_date?: string } = {
-          cover_path: coverPath,
-        };
-        if (releaseDate) updatePayload.release_date = releaseDate;
-        const updateRes = await supabase.from("albums").update(updatePayload).eq("id", albumId);
-        if (updateRes.error) throw updateRes.error;
+          const updatePayload: { cover_path: string; release_date?: string } = {
+            cover_path: coverPath,
+          };
+          if (releaseDate) updatePayload.release_date = releaseDate;
+          const updateRes = await supabase.from("albums").update(updatePayload).eq("id", albumId);
+          if (updateRes.error) throw updateRes.error;
+        }
       }
 
       const payload = {
