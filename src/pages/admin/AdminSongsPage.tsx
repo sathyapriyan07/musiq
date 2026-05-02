@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { SearchBar } from "../../components/SearchBar";
 import {
   AdminButton,
   AdminCard,
@@ -30,6 +31,7 @@ import { supabase } from "../../lib/supabaseClient";
 
 export function AdminSongsPage() {
   const [rows, setRows] = useState<SongRow[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [artists, setArtists] = useState<Pick<ArtistRow, "id" | "name">[]>([]);
   const [albums, setAlbums] = useState<Pick<AlbumRow, "id" | "title">[]>([]);
   const [channels, setChannels] = useState<Pick<ChannelRow, "id" | "name">[]>([]);
@@ -690,9 +692,25 @@ export function AdminSongsPage() {
     return map;
   }, [albums]);
 
+  const filteredRows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) => {
+      const artistName = r.primary_artist_id
+        ? artistNameById.get(r.primary_artist_id) ?? ""
+        : "";
+      const albumTitle = r.album_id ? albumTitleById.get(r.album_id) ?? "" : "";
+      return (
+        r.title.toLowerCase().includes(q) ||
+        artistName.toLowerCase().includes(q) ||
+        albumTitle.toLowerCase().includes(q)
+      );
+    });
+  }, [albumTitleById, artistNameById, rows, searchQuery]);
+
   const table = useMemo(() => {
     if (loading) return null;
-    if (!rows.length) {
+    if (!filteredRows.length) {
       return (
         <AdminEmpty
           title="No songs yet"
@@ -703,7 +721,7 @@ export function AdminSongsPage() {
 
     return (
       <DataTable
-        rows={rows}
+        rows={filteredRows}
         keyForRow={(r) => r.id}
         columns={[
           { key: "title", header: "Title", cell: (r) => r.title },
@@ -740,7 +758,7 @@ export function AdminSongsPage() {
         ]}
       />
     );
-  }, [albumTitleById, artistNameById, loading, rows]);
+  }, [albumTitleById, artistNameById, filteredRows, loading]);
 
   return (
     <div className="space-y-5">
@@ -757,6 +775,12 @@ export function AdminSongsPage() {
           </AdminButton>
         </div>
       </div>
+
+      <SearchBar
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        placeholder="Search songs by title, artist, or album..."
+      />
 
       <AdminCard title="Songs table">
         {error ? <ErrorState title="Error" description={error} /> : null}

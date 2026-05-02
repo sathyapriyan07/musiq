@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { SearchBar } from "../../components/SearchBar";
 import {
   AdminButton,
   AdminCard,
@@ -16,6 +17,7 @@ import { ensureArtistByName, listAlbums, listArtists, listChannels } from "../..
 
 export function AdminAlbumsPage() {
   const [rows, setRows] = useState<AlbumRow[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [artists, setArtists] = useState<Pick<ArtistRow, "id" | "name">[]>([]);
   const [channels, setChannels] = useState<Pick<ChannelRow, "id" | "name">[]>([]);
   const [loading, setLoading] = useState(true);
@@ -519,15 +521,27 @@ export function AdminAlbumsPage() {
     return map;
   }, [artists]);
 
+  const filteredRows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) => {
+      const artistName = r.artist_id ? artistNameById.get(r.artist_id) ?? "" : "";
+      return (
+        r.title.toLowerCase().includes(q) ||
+        artistName.toLowerCase().includes(q)
+      );
+    });
+  }, [artistNameById, rows, searchQuery]);
+
   const table = useMemo(() => {
     if (loading) return null;
-    if (!rows.length) {
+    if (!filteredRows.length) {
       return <AdminEmpty title="No albums yet" description="Create an album or import from iTunes." />;
     }
 
     return (
       <DataTable
-        rows={rows}
+        rows={filteredRows}
         keyForRow={(r) => r.id}
         columns={[
           { key: "title", header: "Title", cell: (r) => r.title },
@@ -557,7 +571,7 @@ export function AdminAlbumsPage() {
         ]}
       />
     );
-  }, [artistNameById, loading, rows]);
+  }, [artistNameById, filteredRows, loading]);
 
   return (
     <div className="space-y-5">
@@ -573,6 +587,12 @@ export function AdminAlbumsPage() {
           </AdminButton>
         </div>
       </div>
+
+      <SearchBar
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        placeholder="Search albums by title or artist..."
+      />
 
       <AdminCard title="Albums">
         {error ? <ErrorState title="Error" description={error} /> : null}

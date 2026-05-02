@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { SearchBar } from "../../components/SearchBar";
 import {
   AdminButton,
   AdminCard,
@@ -14,6 +15,7 @@ import { listArtists } from "../../admin/supabaseAdmin";
 
 export function AdminArtistsPage() {
   const [rows, setRows] = useState<ArtistRow[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -156,9 +158,18 @@ export function AdminArtistsPage() {
     await refresh();
   }
 
+  const filteredRows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) =>
+      r.name.toLowerCase().includes(q) ||
+      (r.bio ?? "").toLowerCase().includes(q)
+    );
+  }, [rows, searchQuery]);
+
   const table = useMemo(() => {
     if (loading) return null;
-    if (!rows.length) {
+    if (!filteredRows.length) {
       return (
         <AdminEmpty
           title="No artists yet"
@@ -169,7 +180,7 @@ export function AdminArtistsPage() {
 
     return (
       <DataTable
-        rows={rows}
+        rows={filteredRows}
         keyForRow={(r) => r.id}
         columns={[
           { key: "name", header: "Name", cell: (r) => r.name },
@@ -194,7 +205,7 @@ export function AdminArtistsPage() {
         ]}
       />
     );
-  }, [loading, rows]);
+  }, [filteredRows, loading]);
 
   return (
     <div className="space-y-5">
@@ -204,6 +215,12 @@ export function AdminArtistsPage() {
           Add Artist
         </AdminButton>
       </div>
+
+      <SearchBar
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        placeholder="Search artists by name or bio..."
+      />
 
       <AdminCard title="Artists">
         {error ? <ErrorState title="Error" description={error} /> : null}
